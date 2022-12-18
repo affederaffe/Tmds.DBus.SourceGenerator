@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tmds.DBus.SourceGenerator", "Tmds.DBus.SourceGenerator\Tmds.DBus.SourceGenerator.csproj", "{8E4BB7B4-94F1-46BF-BA88-898BB9D74B7C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tmds.DBus.SourceGenerator.Test", "Tmds.DBus.SourceGenerator.Test\Tmds.DBus.SourceGenerator.Test.csproj", "{C6157455-CC33-4316-A7CF-945F3DB13E08}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +14,9 @@ Global
 		{8E4BB7B4-94F1-46BF-BA88-898BB9D74B7C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8E4BB7B4-94F1-46BF-BA88-898BB9D74B7C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8E4BB7B4-94F1-46BF-BA88-898BB9D74B7C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C6157455-CC33-4316-A7CF-945F3DB13E08}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C6157455-CC33-4316-A7CF-945F3DB13E08}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C6157455-CC33-4316-A7CF-945F3DB13E08}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C6157455-CC33-4316-A7CF-945F3DB13E08}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
