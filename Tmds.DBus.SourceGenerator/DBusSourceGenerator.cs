@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 
 using Microsoft.CodeAnalysis;
@@ -12,31 +10,30 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 namespace Tmds.DBus.SourceGenerator
 {
     [Generator]
-    public partial class DBusSourceGenerator : ISourceGenerator
+    public partial class DBusSourceGenerator : IIncrementalGenerator
     {
-        public void Initialize(GeneratorInitializationContext context) { }
-
-        public void Execute(GeneratorExecutionContext context)
+        public void Initialize(IncrementalGeneratorInitializationContext context)
         {
-            IEnumerable<ClassDeclarationSyntax> classNodes = context.Compilation.SyntaxTrees.SelectMany(static tree => tree.GetRoot().DescendantNodes().OfType<ClassDeclarationSyntax>());
-            INamedTypeSymbol? attributeType = context.Compilation.GetTypeByMetadataName("Tmds.DBus.SourceGenerator.DBusInterfaceAttribute");
-            foreach (ClassDeclarationSyntax classNode in classNodes)
+            IncrementalValuesProvider<GeneratorAttributeSyntaxContext> classWithAttributeProvider = context.SyntaxProvider.ForAttributeWithMetadataName(
+                "Tmds.DBus.SourceGenerator.DBusInterfaceAttribute",
+                static (node, _) => node is ClassDeclarationSyntax,
+                static (ctx, _) => ctx);
+
+            context.RegisterSourceOutput(classWithAttributeProvider, (productionContext, syntaxContext) =>
             {
-                SemanticModel semanticModel = context.Compilation.GetSemanticModel(classNode.SyntaxTree);
-                INamedTypeSymbol? declaredClass = semanticModel.GetDeclaredSymbol(classNode);
+                ClassDeclarationSyntax classNode = (ClassDeclarationSyntax)syntaxContext.TargetNode;
+                INamedTypeSymbol? declaredClass = syntaxContext.SemanticModel.GetDeclaredSymbol(classNode);
                 if (declaredClass is null) return;
-                AttributeData? attribute = declaredClass.GetAttributes().FirstOrDefault(x => SymbolEqualityComparer.Default.Equals(x.AttributeClass, attributeType));
-                if (attribute is null) continue;
                 string @namespace = declaredClass.ContainingNamespace.ToDisplayString();
-                TypeDeclarationSyntax? typeDeclarationSyntax = GenerateProxy(semanticModel, classNode, attribute);
+                TypeDeclarationSyntax? typeDeclarationSyntax = GenerateProxy(syntaxContext.SemanticModel, classNode, syntaxContext.Attributes[0]);
                 if (typeDeclarationSyntax is null) return;
                 NamespaceDeclarationSyntax namespaceDeclaration = NamespaceDeclaration(IdentifierName(@namespace))
                     .AddUsings(
                         UsingDirective(IdentifierName("Tmds.DBus.Protocol")))
                     .AddMembers(typeDeclarationSyntax);
                 CompilationUnitSyntax compilationUnitSyntax = MakeCompilationUnit(namespaceDeclaration);
-                context.AddSource($"{@namespace}.{declaredClass.Name}.g.cs", compilationUnitSyntax.GetText(Encoding.UTF8));
-            }
+                productionContext.AddSource($"{@namespace}.{declaredClass.Name}.g.cs", compilationUnitSyntax.GetText(Encoding.UTF8));
+            });
         }
 
         private static CompilationUnitSyntax MakeCompilationUnit(NamespaceDeclarationSyntax namespaceDeclaration) =>
