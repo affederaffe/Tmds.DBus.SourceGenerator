@@ -31,8 +31,8 @@ namespace Tmds.DBus.SourceGenerator
             {
                 if (parameter.Type is null) continue;
                 TypeInfo typeInfo = semanticModel.GetTypeInfo(parameter.Type);
-                if (typeInfo.Type is not INamedTypeSymbol type) continue;
-                sb.Append(ParseTypeForSignature(type, semanticModel));
+                if (typeInfo.Type is null) continue;
+                sb.Append(ParseTypeForSignature(typeInfo.Type, semanticModel));
             }
 
             return sb.ToString();
@@ -54,7 +54,7 @@ namespace Tmds.DBus.SourceGenerator
             SpecialType.System_Object => "Variant",
             SpecialType.None when InheritsFrom(type, semanticModel.Compilation.GetTypeByMetadataName("System.Runtime.InteropServices.SafeHandle")) => $"Handle<{type.ToDisplayString()}>",
             SpecialType.None when SymbolEqualityComparer.Default.Equals(type, semanticModel.Compilation.GetTypeByMetadataName("Tmds.DBus.Protocol.ObjectPath")) => "ObjectPath",
-            SpecialType.None when type is IArrayTypeSymbol arrayTypeSymbol=> $"Array<{arrayTypeSymbol.BaseType!.ToDisplayString()}>",
+            SpecialType.None when type is IArrayTypeSymbol arrayTypeSymbol => $"Array<{arrayTypeSymbol.BaseType!.ToDisplayString()}>",
             SpecialType.None when type is INamedTypeSymbol { IsGenericType: true } namedTypeSymbol && SymbolEqualityComparer.Default.Equals(namedTypeSymbol.ConstructedFrom, semanticModel.Compilation.GetTypeByMetadataName("System.Collections.Generic.Dictionary`2")) => $"Dictionary<{namedTypeSymbol.TypeArguments[0].ToDisplayString()}, {namedTypeSymbol.TypeArguments[1].ToDisplayString()}>",
             _ => throw new ArgumentOutOfRangeException($"Cannot parse type {type} for signature.")
         };
@@ -75,7 +75,7 @@ namespace Tmds.DBus.SourceGenerator
                 SpecialType.System_Object => "v",
                 SpecialType.None when InheritsFrom(type, semanticModel.Compilation.GetTypeByMetadataName("System.Runtime.InteropServices.SafeHandle")) => "h",
                 SpecialType.None when SymbolEqualityComparer.Default.Equals(type, semanticModel.Compilation.GetTypeByMetadataName("Tmds.DBus.Protocol.ObjectPath")) => "o",
-                SpecialType.None when type.TypeKind == TypeKind.Array => $"a{ParseTypeForSignature(type.BaseType!, semanticModel)}",
+                SpecialType.None when type is IArrayTypeSymbol arrayTypeSymbol => $"a{ParseTypeForSignature(arrayTypeSymbol.ElementType, semanticModel)}",
                 SpecialType.None when type is INamedTypeSymbol { IsGenericType: true } namedTypeSymbol && SymbolEqualityComparer.Default.Equals(namedTypeSymbol.ConstructedFrom, semanticModel.Compilation.GetTypeByMetadataName("System.Collections.Generic.Dictionary`2")) => $"a{{{ParseTypeForSignature(namedTypeSymbol.TypeArguments[0], semanticModel)}{ParseTypeForSignature(namedTypeSymbol.TypeArguments[1], semanticModel)}}}",
                 _ => throw new ArgumentOutOfRangeException($"Cannot parse type {type} for signature.")
             };
