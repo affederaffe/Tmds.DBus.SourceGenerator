@@ -9,7 +9,7 @@ namespace Tmds.DBus.SourceGenerator
 {
     public partial class DBusSourceGenerator
     {
-        private static bool InheritsFrom(ITypeSymbol? symbol, ISymbol type)
+        private static bool InheritsFrom(ITypeSymbol? symbol, ISymbol? type)
         {
             ITypeSymbol? baseType = symbol?.BaseType;
             while (baseType is not null)
