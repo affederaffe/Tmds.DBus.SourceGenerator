@@ -19,10 +19,7 @@ namespace Tmds.DBus.SourceGenerator
         private static string? ParseReadMethod(SemanticModel semanticModel, TypeSyntax returnTypeSyntax)
         {
             TypeInfo typeInfo = semanticModel.GetTypeInfo(returnTypeSyntax);
-
-            if (typeInfo.Type is not INamedTypeSymbol taskType)
-                return null;
-
+            if (typeInfo.Type is not INamedTypeSymbol taskType) return null;
             return taskType.Arity == 0 ? null : $"Read{ParseTypeForReadWriteMethod(taskType.TypeArguments[0], semanticModel)}";
         }
 

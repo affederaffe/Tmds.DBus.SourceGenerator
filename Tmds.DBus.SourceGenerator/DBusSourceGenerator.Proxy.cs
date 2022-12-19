@@ -112,7 +112,7 @@ namespace Tmds.DBus.SourceGenerator
                                     InvocationExpression(IdentifierName(createMethodIdentifier))),
                                 Argument(messageValueReaderLambda))),
                     LocalFunctionStatement(ParseTypeName(nameof(MessageBuffer)), createMethodIdentifier)
-                        .WithBody(Block(createMessageBody))));
+                        .WithBody(createMessageBody)));
 
                 cl = cl.AddMembers(proxyMethod);
             }
