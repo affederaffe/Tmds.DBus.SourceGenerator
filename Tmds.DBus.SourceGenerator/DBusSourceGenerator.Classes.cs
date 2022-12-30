@@ -1,8 +1,6 @@
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
-using Tmds.DBus.Protocol;
-
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 
@@ -31,28 +29,6 @@ namespace Tmds.DBus.SourceGenerator
                                 .WithBody(
                                     Block().AddStatements(MakeAssignmentExpressionStatement("ServiceName", "serviceName"))),
                             MakeGetOnlyProperty(PredefinedType(Token(SyntaxKind.StringKeyword)), "ServiceName", Token(SyntaxKind.PublicKeyword)))));
-
-        private static CompilationUnitSyntax MakeDBusObjectClass() => MakeCompilationUnit(
-            NamespaceDeclaration(IdentifierName("Tmds.DBus.SourceGenerator"))
-                .AddMembers(
-                    ClassDeclaration("DBusObject")
-                        .AddModifiers(Token(SyntaxKind.PublicKeyword))
-                        .AddMembers(
-                            ConstructorDeclaration("DBusObject")
-                                .AddModifiers(Token(SyntaxKind.PublicKeyword))
-                                .AddParameterListParameters(
-                                    Parameter(Identifier("connection")).WithType(ParseTypeName(nameof(Connection))),
-                                    Parameter(Identifier("destination")).WithType(PredefinedType(Token(SyntaxKind.StringKeyword))),
-                                    Parameter(Identifier("path")).WithType(PredefinedType(Token(SyntaxKind.StringKeyword))))
-                                .WithBody(
-                                    Block(
-                                        MakeAssignmentExpressionStatement("Connection", "connection"),
-                                        MakeAssignmentExpressionStatement("Destination", "destination"),
-                                        MakeAssignmentExpressionStatement("Path", "path"))),
-                            MakeGetOnlyProperty(ParseTypeName(nameof(Connection)), "Connection", Token(SyntaxKind.ProtectedKeyword)),
-                            MakeGetOnlyProperty(PredefinedType(Token(SyntaxKind.StringKeyword)), "Destination", Token(SyntaxKind.ProtectedKeyword)),
-                            MakeGetOnlyProperty(PredefinedType(Token(SyntaxKind.StringKeyword)), "Path", Token(SyntaxKind.ProtectedKeyword)))
-                ));
 
         private static CompilationUnitSyntax MakePropertyChangesClass() => MakeCompilationUnit(
             NamespaceDeclaration(IdentifierName("Tmds.DBus.SourceGenerator"))

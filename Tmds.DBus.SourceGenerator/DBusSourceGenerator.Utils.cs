@@ -1,3 +1,5 @@
+using System.Linq;
+
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -49,6 +51,10 @@ namespace Tmds.DBus.SourceGenerator
                     IdentifierName(left),
                     IdentifierName(right)));
 
+        private static LiteralExpressionSyntax MakeLiteralExpression(string literal) => LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(literal));
+
+        private static LiteralExpressionSyntax MakeLiteralExpression(int literal) => LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(literal));
+
         private static bool InheritsFrom(ITypeSymbol? symbol, ISymbol? type)
         {
             ITypeSymbol? baseType = symbol?.BaseType;
@@ -63,8 +69,8 @@ namespace Tmds.DBus.SourceGenerator
             return false;
         }
 
-        private static LiteralExpressionSyntax MakeLiteralExpression(string literal) => LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(literal));
-
-        private static LiteralExpressionSyntax MakeLiteralExpression(int literal) => LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(literal));
+        private static SyntaxTokenList GetAccessibilityModifiers(SyntaxTokenList modifiers) => TokenList(
+            modifiers.Where(static x =>
+                x.IsKind(SyntaxKind.PublicKeyword) || x.IsKind(SyntaxKind.InternalKeyword) || x.IsKind(SyntaxKind.PrivateKeyword) || x.IsKind(SyntaxKind.ProtectedKeyword)));
     }
 }

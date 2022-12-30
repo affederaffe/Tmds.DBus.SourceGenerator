@@ -22,21 +22,26 @@ namespace Tmds.DBus.SourceGenerator
             context.RegisterPostInitializationOutput(static initializationContext =>
             {
                 initializationContext.AddSource("Tmds.DBus.SourceGenerator.DBusInterfaceAttribute.cs", MakeDBusInterfaceAttribute().GetText(Encoding.UTF8));
-                initializationContext.AddSource("Tmds.DBus.SourceGenerator.DBusObject.cs", MakeDBusObjectClass().GetText(Encoding.UTF8));
                 initializationContext.AddSource("Tmds.DBus.SourceGenerator.PropertyChanges.cs", MakePropertyChangesClass().GetText(Encoding.UTF8));
             });
 
-            context.RegisterSourceOutput(classWithAttributeProvider, static (productionContext, syntaxContext) =>
+            context.RegisterSourceOutput(classWithAttributeProvider.Collect(), static (productionContext, syntaxContexts) =>
             {
-                ClassDeclarationSyntax classNode = (ClassDeclarationSyntax)syntaxContext.TargetNode;
-                INamedTypeSymbol? declaredClass = syntaxContext.SemanticModel.GetDeclaredSymbol(classNode);
-                if (declaredClass is null) return;
-                string @namespace = declaredClass.ContainingNamespace.ToDisplayString();
-                TypeDeclarationSyntax? typeDeclarationSyntax = GenerateProxy(syntaxContext.SemanticModel, classNode, syntaxContext.Attributes[0]);
-                if (typeDeclarationSyntax is null) return;
-                NamespaceDeclarationSyntax namespaceDeclaration = NamespaceDeclaration(IdentifierName(@namespace)).AddMembers(typeDeclarationSyntax);
-                CompilationUnitSyntax compilationUnitSyntax = MakeCompilationUnit(namespaceDeclaration);
-                productionContext.AddSource($"{@namespace}.{declaredClass.Name}.g.cs", compilationUnitSyntax.GetText(Encoding.UTF8));
+                foreach (GeneratorAttributeSyntaxContext syntaxContext in syntaxContexts)
+                {
+                    ClassDeclarationSyntax classNode = (ClassDeclarationSyntax)syntaxContext.TargetNode;
+                    INamedTypeSymbol? declaredClass = syntaxContext.SemanticModel.GetDeclaredSymbol(classNode);
+                    if (declaredClass is null) return;
+                    string @namespace = declaredClass.ContainingNamespace.ToDisplayString();
+                    TypeDeclarationSyntax? typeDeclarationSyntax = GenerateProxy(syntaxContext.SemanticModel, classNode, syntaxContext.Attributes[0]);
+                    if (typeDeclarationSyntax is null) return;
+                    NamespaceDeclarationSyntax namespaceDeclaration = NamespaceDeclaration(IdentifierName(@namespace)).AddMembers(typeDeclarationSyntax);
+                    CompilationUnitSyntax compilationUnitSyntax = MakeCompilationUnit(namespaceDeclaration);
+                    productionContext.AddSource($"{@namespace}.{declaredClass.Name}.g.cs", compilationUnitSyntax.GetText(Encoding.UTF8));
+                }
+
+                //productionContext.AddSource("ReaderExtensions.cs", );
+                //productionContext.AddSource("WriterExtensions.cs", );
             });
         }
     }
