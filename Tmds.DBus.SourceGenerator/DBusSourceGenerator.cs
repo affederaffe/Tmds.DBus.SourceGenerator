@@ -19,6 +19,13 @@ namespace Tmds.DBus.SourceGenerator
                 static (node, _) => node is ClassDeclarationSyntax,
                 static (ctx, _) => ctx);
 
+            context.RegisterPostInitializationOutput(static initializationContext =>
+            {
+                initializationContext.AddSource("Tmds.DBus.SourceGenerator.DBusInterfaceAttribute.cs", MakeDBusInterfaceAttribute().GetText(Encoding.UTF8));
+                initializationContext.AddSource("Tmds.DBus.SourceGenerator.DBusObject.cs", MakeDBusObjectClass().GetText(Encoding.UTF8));
+                initializationContext.AddSource("Tmds.DBus.SourceGenerator.PropertyChanges.cs", MakePropertyChangesClass().GetText(Encoding.UTF8));
+            });
+
             context.RegisterSourceOutput(classWithAttributeProvider, static (productionContext, syntaxContext) =>
             {
                 ClassDeclarationSyntax classNode = (ClassDeclarationSyntax)syntaxContext.TargetNode;

@@ -16,31 +16,34 @@ namespace Tmds.DBus.SourceGenerator
     {
         private static TypeDeclarationSyntax? GenerateProxy(SemanticModel semanticModel, TypeDeclarationSyntax declaration, AttributeData attributeData)
         {
-            if (attributeData.ConstructorArguments.Length != 2 || attributeData.ConstructorArguments[0].Value is not string path || attributeData.ConstructorArguments[1].Value is not string @interface)
+            if (attributeData.ConstructorArguments.Length != 1 || attributeData.ConstructorArguments[0].Value is not string @interface)
                 return null;
-            ClassDeclarationSyntax cl = ClassDeclaration(declaration.Identifier)
-                .WithModifiers(declaration.Modifiers);
 
-            FieldDeclarationSyntax connectionField = FieldDeclaration(VariableDeclaration(ParseTypeName(nameof(Connection)))
-                    .AddVariables(VariableDeclarator("_connection")))
-                .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
+            ClassDeclarationSyntax cl = ClassDeclaration(declaration.Identifier)
+                .WithModifiers(declaration.Modifiers)
+                .AddBaseListTypes(SimpleBaseType(IdentifierName("DBusObject")));
+
+            FieldDeclarationSyntax interfaceConst = MakePrivateStringConst("Interface", @interface, PredefinedType(Token(SyntaxKind.StringKeyword)));
 
             ConstructorDeclarationSyntax ctor = ConstructorDeclaration(declaration.Identifier)
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(
-                    Parameter(Identifier("connection")).WithType(ParseTypeName(nameof(Connection))))
-                .WithBody(Block(
-                    ExpressionStatement(
-                        AssignmentExpression(
-                            SyntaxKind.SimpleAssignmentExpression,
-                            IdentifierName("_connection"),
-                            IdentifierName("connection")))));
+                    Parameter(Identifier("connection")).WithType(ParseTypeName(nameof(Connection))),
+                    Parameter(Identifier("destination")).WithType(PredefinedType(Token(SyntaxKind.StringKeyword))),
+                    Parameter(Identifier("path")).WithType(PredefinedType(Token(SyntaxKind.StringKeyword))))
+                .WithInitializer(
+                    ConstructorInitializer(SyntaxKind.BaseConstructorInitializer)
+                        .AddArgumentListArguments(
+                            Argument(IdentifierName("connection")),
+                            Argument(IdentifierName("destination")),
+                            Argument(IdentifierName("path"))))
+                .WithBody(Block());
 
-            cl = cl.AddMembers(connectionField, ctor);
-            return AddMethods(cl, semanticModel, declaration, path, @interface);
+            cl = cl.AddMembers(interfaceConst, ctor);
+            return AddMethods(cl, semanticModel, declaration);
         }
 
-        private static ClassDeclarationSyntax AddMethods(ClassDeclarationSyntax cl, SemanticModel semanticModel, TypeDeclarationSyntax declaration, string path, string @interface)
+        private static ClassDeclarationSyntax AddMethods(ClassDeclarationSyntax cl, SemanticModel semanticModel, TypeDeclarationSyntax declaration)
         {
             foreach (MethodDeclarationSyntax methodDeclaration in declaration.Members.OfType<MethodDeclarationSyntax>())
             {
@@ -53,15 +56,14 @@ namespace Tmds.DBus.SourceGenerator
                             VariableDeclarator("writer")
                                 .WithInitializer(EqualsValueClause(
                                     InvocationExpression(
-                                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("_connection"), IdentifierName(nameof(Connection.GetMessageWriter)))))))))
+                                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("Connection"), IdentifierName(nameof(Connection.GetMessageWriter)))))))))
                     .WithUsingKeyword(Token(SyntaxKind.UsingKeyword)),
                     ExpressionStatement(
                         InvocationExpression(
                                 MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("writer"), IdentifierName(nameof(MessageWriter.WriteMethodCallHeader))))
                             .AddArgumentListArguments(
-                                Argument(MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("_connection"), IdentifierName(nameof(Connection.UniqueName)))),
-                                Argument(MakeLiteralExpression(path)),
-                                Argument(MakeLiteralExpression(@interface)),
+                                Argument(MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("Connection"), IdentifierName(nameof(Connection.UniqueName)))),
+                                Argument(IdentifierName("Interface")),
                                 Argument(MakeLiteralExpression(ParseSignature(semanticModel, methodDeclaration))),
                                 Argument(MakeLiteralExpression(methodName)))));
 
@@ -85,19 +87,23 @@ namespace Tmds.DBus.SourceGenerator
                             MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("writer"),
                                 IdentifierName(nameof(MessageWriter.CreateMessage))))));
 
-                ParenthesizedLambdaExpressionSyntax messageValueReaderLambda = ParenthesizedLambdaExpression()
-                    .AddParameterListParameters(
-                        Parameter(Identifier("message")).WithType(ParseTypeName(nameof(Message))),
-                        Parameter(Identifier("state")).WithType(NullableType(PredefinedType(Token(SyntaxKind.ObjectKeyword)))));
-
                 string? returnType = ParseReadMethod(semanticModel, methodDeclaration.ReturnType);
-                    messageValueReaderLambda = returnType is null
-                        ? messageValueReaderLambda.WithBody(Block())
-                        : messageValueReaderLambda.WithExpressionBody(
+
+                ParenthesizedLambdaExpressionSyntax? messageValueReaderLambda = returnType is null
+                    ? null
+                    : ParenthesizedLambdaExpression()
+                        .AddParameterListParameters(
+                            Parameter(Identifier("message")).WithType(ParseTypeName(nameof(Message))),
+                            Parameter(Identifier("state")).WithType(NullableType(PredefinedType(Token(SyntaxKind.ObjectKeyword)))))
+                        . WithExpressionBody(
                             InvocationExpression(
                                 MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, InvocationExpression(
                                         MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("message"), IdentifierName(nameof(Message.GetBodyReader)))),
                                     IdentifierName(returnType))));
+
+                ArgumentListSyntax args = ArgumentList().AddArguments(Argument(InvocationExpression(IdentifierName(createMethodIdentifier))));
+                if (messageValueReaderLambda is not null)
+                    args = args.AddArguments(Argument(messageValueReaderLambda));
 
                 MethodDeclarationSyntax proxyMethod = MethodDeclaration(methodDeclaration.ReturnType, methodDeclaration.Identifier)
                     .WithModifiers(methodDeclaration.Modifiers)
@@ -105,12 +111,9 @@ namespace Tmds.DBus.SourceGenerator
                     .WithBody(Block(
                     ReturnStatement(
                         InvocationExpression(
-                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("_connection"),
+                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("Connection"),
                                     IdentifierName(nameof(Connection.CallMethodAsync))))
-                            .AddArgumentListArguments(
-                                Argument(
-                                    InvocationExpression(IdentifierName(createMethodIdentifier))),
-                                Argument(messageValueReaderLambda))),
+                            .WithArgumentList(args)),
                     LocalFunctionStatement(ParseTypeName(nameof(MessageBuffer)), createMethodIdentifier)
                         .WithBody(createMessageBody)));
 

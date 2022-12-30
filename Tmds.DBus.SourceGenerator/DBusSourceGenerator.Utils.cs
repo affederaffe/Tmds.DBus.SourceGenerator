@@ -1,7 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 
@@ -12,6 +11,9 @@ namespace Tmds.DBus.SourceGenerator
         private static CompilationUnitSyntax MakeCompilationUnit(NamespaceDeclarationSyntax namespaceDeclaration) =>
             CompilationUnit()
                 .AddUsings(
+                    UsingDirective(IdentifierName("System")),
+                    UsingDirective(IdentifierName("System.Collections.Generic")),
+                    UsingDirective(IdentifierName("System.Runtime.InteropServices")),
                     UsingDirective(IdentifierName("Tmds.DBus.Protocol")))
                 .AddMembers(namespaceDeclaration
                     .WithLeadingTrivia(
@@ -21,6 +23,31 @@ namespace Tmds.DBus.SourceGenerator
                             Trivia(NullableDirectiveTrivia(Token(SyntaxKind.EnableKeyword), true)))
                     )
                 ).NormalizeWhitespace();
+
+        private static FieldDeclarationSyntax MakePrivateStringConst(string identifier, string value, TypeSyntax type) =>
+            FieldDeclaration(VariableDeclaration(type)
+                    .AddVariables(VariableDeclarator(identifier)
+                        .WithInitializer(EqualsValueClause(MakeLiteralExpression(value)))))
+                .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ConstKeyword));
+
+        private static FieldDeclarationSyntax MakePrivateReadOnlyField(string identifier, TypeSyntax type) =>
+            FieldDeclaration(VariableDeclaration(type)
+                    .AddVariables(VariableDeclarator(identifier)))
+                .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
+
+        private static PropertyDeclarationSyntax MakeGetOnlyProperty(TypeSyntax type, string identifier, params SyntaxToken[] modifiers) =>
+            PropertyDeclaration(type, identifier)
+                .AddModifiers(modifiers)
+                .AddAccessorListAccessors(
+                    AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
+                        .WithSemicolonToken(Token(SyntaxKind.SemicolonToken)));
+
+        private static ExpressionStatementSyntax MakeAssignmentExpressionStatement(string left, string right) =>
+            ExpressionStatement(
+                AssignmentExpression(
+                    SyntaxKind.SimpleAssignmentExpression,
+                    IdentifierName(left),
+                    IdentifierName(right)));
 
         private static bool InheritsFrom(ITypeSymbol? symbol, ISymbol? type)
         {
@@ -37,5 +64,7 @@ namespace Tmds.DBus.SourceGenerator
         }
 
         private static LiteralExpressionSyntax MakeLiteralExpression(string literal) => LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(literal));
+
+        private static LiteralExpressionSyntax MakeLiteralExpression(int literal) => LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(literal));
     }
 }
