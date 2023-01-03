@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
@@ -40,6 +39,7 @@ namespace Tmds.DBus.SourceGenerator
             {
                 initializationContext.AddSource("Tmds.DBus.SourceGenerator.DBusInterfaceAttribute.cs", MakeDBusInterfaceAttribute().GetText(Encoding.UTF8));
                 initializationContext.AddSource("Tmds.DBus.SourceGenerator.PropertyChanges.cs", MakePropertyChangesClass().GetText(Encoding.UTF8));
+                initializationContext.AddSource("Tmds.DBus.SourceGenerator.SignalHelper.cs", MakeSignalHelperClass().GetText(Encoding.UTF8));
             });
 
             context.RegisterSourceOutput(combinedProvider, (productionContext, providers) =>
@@ -47,32 +47,20 @@ namespace Tmds.DBus.SourceGenerator
                 foreach (GeneratorAttributeSyntaxContext syntaxContext in providers.ClassesWithAttribute)
                 {
                     if (providers.ProjectDir is null || syntaxContext.Attributes[0].ConstructorArguments[0].Value is not string xmlPath) continue;
-
-                    try
-                    {
-                        string path = Path.Combine(providers.ProjectDir, xmlPath);
-                        if (new XmlSerializer(typeof(DBusNode)).Deserialize(new StringReader(File.ReadAllText(path))) is not DBusNode dBusNode)
-                        {
-                            productionContext.AddSource("Exc", xmlPath);
-                            break;
-                        }
-                        if (dBusNode.Interface is null) continue;
-                        ClassDeclarationSyntax classNode = (ClassDeclarationSyntax)syntaxContext.TargetNode;
-                        INamedTypeSymbol? declaredClass = syntaxContext.SemanticModel.GetDeclaredSymbol(classNode);
-                        if (declaredClass is null) continue;
-                        string @namespace = declaredClass.ContainingNamespace.ToDisplayString();
-                        TypeDeclarationSyntax typeDeclarationSyntax = GenerateProxy(classNode, dBusNode.Interface);
-                        NamespaceDeclarationSyntax namespaceDeclaration = NamespaceDeclaration(IdentifierName(@namespace)).AddMembers(typeDeclarationSyntax);
-                        CompilationUnitSyntax compilationUnit = MakeCompilationUnit(namespaceDeclaration);
-                        productionContext.AddSource($"{@namespace}.{declaredClass.Name}.g.cs", compilationUnit.GetText(Encoding.UTF8));
-                    }
-                    catch (Exception e)
-                    {
-                        productionContext.AddSource("Log", e + "\n" + e.InnerException);
-                    }
+                    string path = Path.Combine(providers.ProjectDir, xmlPath);
+                    if (new XmlSerializer(typeof(DBusNode)).Deserialize(new StringReader(File.ReadAllText(path))) is not DBusNode dBusNode) continue;
+                    if (dBusNode.Interface is null) continue;
+                    ClassDeclarationSyntax classNode = (ClassDeclarationSyntax)syntaxContext.TargetNode;
+                    INamedTypeSymbol? declaredClass = syntaxContext.SemanticModel.GetDeclaredSymbol(classNode);
+                    if (declaredClass is null) continue;
+                    string @namespace = declaredClass.ContainingNamespace.ToDisplayString();
+                    TypeDeclarationSyntax typeDeclarationSyntax = GenerateProxy(classNode, dBusNode.Interface);
+                    NamespaceDeclarationSyntax namespaceDeclaration = NamespaceDeclaration(IdentifierName(@namespace)).AddMembers(typeDeclarationSyntax);
+                    CompilationUnitSyntax compilationUnit = MakeCompilationUnit(namespaceDeclaration);
+                    productionContext.AddSource($"{@namespace}.{declaredClass.Name}.g.cs", compilationUnit.GetText(Encoding.UTF8));
                 }
 
-                productionContext.AddSource("ReaderExtensions.cs", MakeCompilationUnit(NamespaceDeclaration(IdentifierName("Tmds.DBus.SourceGenerator")).AddMembers(_readerExtensions)).GetText(Encoding.UTF8));
+                productionContext.AddSource("Tmds.DBus.SourceGenerator.ReaderExtensions.cs", MakeCompilationUnit(NamespaceDeclaration(IdentifierName("Tmds.DBus.SourceGenerator")).AddMembers(_readerExtensions)).GetText(Encoding.UTF8));
             });
         }
     }

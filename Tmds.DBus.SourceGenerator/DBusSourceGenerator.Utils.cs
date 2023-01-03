@@ -58,11 +58,13 @@ namespace Tmds.DBus.SourceGenerator
                         ));
 
         private static ExpressionStatementSyntax MakeAssignmentExpressionStatement(string left, string right) =>
-            ExpressionStatement(
-                AssignmentExpression(
-                    SyntaxKind.SimpleAssignmentExpression,
-                    IdentifierName(left),
-                    IdentifierName(right)));
+            ExpressionStatement(MakeAssignmentExpression(IdentifierName(left), IdentifierName(right)));
+
+        private static AssignmentExpressionSyntax MakeAssignmentExpression(ExpressionSyntax left, ExpressionSyntax right) =>
+            AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, left, right);
+
+        private static MemberAccessExpressionSyntax MakeMemberAccessExpression(string left, string right) =>
+            MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName(left), IdentifierName(right));
 
         private static LiteralExpressionSyntax MakeLiteralExpression(string literal) => LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(literal));
 

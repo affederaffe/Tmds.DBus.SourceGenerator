@@ -20,7 +20,7 @@ namespace Tmds.DBus.SourceGenerator
                                     Attribute(IdentifierName("AttributeUsage"))
                                         .AddArgumentListArguments(
                                             AttributeArgument(
-                                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("AttributeTargets"), IdentifierName("Class"))))))
+                                                MakeMemberAccessExpression("AttributeTargets", "Class")))))
                         .AddMembers(
                             ConstructorDeclaration("DBusInterfaceAttribute")
                                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
@@ -52,7 +52,8 @@ namespace Tmds.DBus.SourceGenerator
                                 .WithExpressionBody(
                                     ArrowExpressionClause(
                                         BinaryExpression(SyntaxKind.NotEqualsExpression,
-                                            InvocationExpression(MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("Array"), IdentifierName("IndexOf")))
+                                            InvocationExpression(
+                                                    MakeMemberAccessExpression("Array", "IndexOf"))
                                                 .AddArgumentListArguments(
                                                     Argument(IdentifierName("Changed")),
                                                     Argument(IdentifierName("property"))),
@@ -65,12 +66,121 @@ namespace Tmds.DBus.SourceGenerator
                                 .WithExpressionBody(
                                     ArrowExpressionClause(
                                         BinaryExpression(SyntaxKind.NotEqualsExpression,
-                                            InvocationExpression(MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("Array"), IdentifierName("IndexOf")))
+                                            InvocationExpression(
+                                                    MakeMemberAccessExpression("Array", "IndexOf"))
                                                 .AddArgumentListArguments(
                                                     Argument(IdentifierName("Invalidated")),
                                                     Argument(IdentifierName("property"))),
                                             MakeLiteralExpression(-1))))
                                 .WithSemicolonToken(Token(SyntaxKind.SemicolonToken)))
                         .WithCloseBraceToken(Token(SyntaxKind.CloseBraceToken))));
+
+        private static CompilationUnitSyntax MakeSignalHelperClass()
+        {
+            MethodDeclarationSyntax watchSignalMethod = MethodDeclaration(ParseTypeName("ValueTask<IDisposable>"), "WatchSignalAsync")
+                .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
+                .AddTypeParameterListParameters(
+                    TypeParameter("T"))
+                .AddParameterListParameters(
+                    Parameter(Identifier("connection"))
+                        .WithType(ParseTypeName("Connection")),
+                    Parameter(Identifier("rule"))
+                        .WithType(ParseTypeName("MatchRule")),
+                    Parameter(Identifier("reader"))
+                        .WithType(ParseTypeName("MessageValueReader<T>")),
+                    Parameter(Identifier("handler"))
+                        .WithType(ParseTypeName("Action<Exception?, T>")),
+                    Parameter(Identifier("emitOnCapturedContext"))
+                        .WithType(PredefinedType(Token(SyntaxKind.BoolKeyword)))
+                        .WithDefault(EqualsValueClause(LiteralExpression(SyntaxKind.TrueLiteralExpression))))
+                .WithBody(
+                    Block(
+                        ReturnStatement(
+                            InvocationExpression(
+                                    MakeMemberAccessExpression("connection", "AddMatchAsync"))
+                                .AddArgumentListArguments(
+                                    Argument(IdentifierName("rule")),
+                                    Argument(IdentifierName("reader")),
+                                    Argument(
+                                        ParenthesizedLambdaExpression()
+                                            .AddModifiers(Token(SyntaxKind.StaticKeyword))
+                                            .AddParameterListParameters(
+                                                Parameter(Identifier("e")).WithType(ParseTypeName("Exception")),
+                                                Parameter(Identifier("arg"))
+                                                    .WithType(ParseTypeName("T")),
+                                                Parameter(Identifier("readerState"))
+                                                    .WithType(NullableType(PredefinedType(Token(SyntaxKind.ObjectKeyword)))),
+                                                Parameter(Identifier("handlerState"))
+                                                    .WithType(NullableType(PredefinedType(Token(SyntaxKind.ObjectKeyword)))))
+                                            .WithExpressionBody(
+                                                InvocationExpression(
+                                                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
+                                                            ParenthesizedExpression(
+                                                                CastExpression(ParseTypeName("Action<Exception?, T>"),
+                                                                    PostfixUnaryExpression(SyntaxKind.SuppressNullableWarningExpression,
+                                                                        IdentifierName("handlerState")))),
+                                                            IdentifierName("Invoke")))
+                                                    .AddArgumentListArguments(
+                                                        Argument(IdentifierName("e")),
+                                                        Argument(IdentifierName("arg"))))),
+                                    Argument(LiteralExpression(SyntaxKind.NullLiteralExpression)),
+                                    Argument(IdentifierName("handler")),
+                                    Argument(IdentifierName("emitOnCapturedContext"))))));
+
+            MethodDeclarationSyntax watchPropertiesMethod = MethodDeclaration(ParseTypeName("ValueTask<IDisposable>"), "WatchPropertiesChangedAsync")
+                .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
+                .AddTypeParameterListParameters(
+                    TypeParameter("T"))
+                .AddParameterListParameters(
+                    Parameter(Identifier("connection"))
+                        .WithType(ParseTypeName("Connection")),
+                    Parameter(Identifier("destination"))
+                        .WithType(PredefinedType(Token(SyntaxKind.StringKeyword))),
+                    Parameter(Identifier("path"))
+                        .WithType(PredefinedType(Token(SyntaxKind.StringKeyword))),
+                    Parameter(Identifier("@interface"))
+                        .WithType(PredefinedType(Token(SyntaxKind.StringKeyword))),
+                    Parameter(Identifier("reader"))
+                        .WithType(ParseTypeName("MessageValueReader<PropertyChanges<T>>")),
+                    Parameter(Identifier("handler"))
+                        .WithType(ParseTypeName("Action<Exception?, PropertyChanges<T>>")),
+                    Parameter(Identifier("emitOnCapturedContext"))
+                        .WithType(PredefinedType(Token(SyntaxKind.BoolKeyword)))
+                        .WithDefault(EqualsValueClause(LiteralExpression(SyntaxKind.TrueLiteralExpression))))
+                .WithBody(
+                    Block(
+                        LocalDeclarationStatement(
+                            VariableDeclaration(ParseTypeName("MatchRule"))
+                                .AddVariables(
+                                    VariableDeclarator("rule")
+                                        .WithInitializer(
+                                            EqualsValueClause(
+                                                ObjectCreationExpression(ParseTypeName("MatchRule"))
+                                                    .WithInitializer(
+                                                        InitializerExpression(SyntaxKind.ObjectInitializerExpression)
+                                                            .AddExpressions(
+                                                                MakeAssignmentExpression(IdentifierName("Type"), MakeMemberAccessExpression("MessageType", "Signal")),
+                                                                MakeAssignmentExpression(IdentifierName("Sender"), IdentifierName("destination")),
+                                                                MakeAssignmentExpression(IdentifierName("Path"), IdentifierName("path")),
+                                                                MakeAssignmentExpression(IdentifierName("Member"), MakeLiteralExpression("PropertiesChanged")),
+                                                                MakeAssignmentExpression(IdentifierName("Interface"), MakeLiteralExpression("org.freedesktop.DBus.Properties")),
+                                                                MakeAssignmentExpression(IdentifierName("Arg0"), IdentifierName("@interface")))))))),
+                        ReturnStatement(
+                            InvocationExpression(
+                                IdentifierName("WatchSignalAsync"))
+                                .AddArgumentListArguments(
+                                    Argument(IdentifierName("connection")),
+                                    Argument(IdentifierName("rule")),
+                                    Argument(IdentifierName("reader")),
+                                    Argument(IdentifierName("handler")),
+                                    Argument(IdentifierName("emitOnCapturedContext"))))));
+
+            return MakeCompilationUnit(
+                NamespaceDeclaration(IdentifierName("Tmds.DBus.SourceGenerator"))
+                    .AddMembers(
+                        ClassDeclaration("SignalHelper")
+                            .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
+                            .AddMembers(watchSignalMethod, watchPropertiesMethod)));
+        }
     }
 }
