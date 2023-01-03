@@ -1,8 +1,10 @@
+using System.Collections.Generic;
 using System.Linq;
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 
@@ -16,7 +18,9 @@ namespace Tmds.DBus.SourceGenerator
                     UsingDirective(IdentifierName("System")),
                     UsingDirective(IdentifierName("System.Collections.Generic")),
                     UsingDirective(IdentifierName("System.Runtime.InteropServices")),
-                    UsingDirective(IdentifierName("Tmds.DBus.Protocol")))
+                    UsingDirective(IdentifierName("System.Threading.Tasks")),
+                    UsingDirective(IdentifierName("Tmds.DBus.Protocol")),
+                    UsingDirective(IdentifierName("Tmds.DBus.SourceGenerator")))
                 .AddMembers(namespaceDeclaration
                     .WithLeadingTrivia(
                         TriviaList(
@@ -44,6 +48,15 @@ namespace Tmds.DBus.SourceGenerator
                     AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
                         .WithSemicolonToken(Token(SyntaxKind.SemicolonToken)));
 
+        private static PropertyDeclarationSyntax MakeGetSetProperty(TypeSyntax type, string identifier, params SyntaxToken[] modifiers) =>
+            PropertyDeclaration(type, identifier)
+                .AddModifiers(modifiers)
+                .AddAccessorListAccessors(
+                    AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
+                        .WithSemicolonToken(Token(SyntaxKind.SemicolonToken)),
+                    AccessorDeclaration(SyntaxKind.SetAccessorDeclaration).WithSemicolonToken(Token(SyntaxKind.SemicolonToken)
+                        ));
+
         private static ExpressionStatementSyntax MakeAssignmentExpressionStatement(string left, string right) =>
             ExpressionStatement(
                 AssignmentExpression(
@@ -55,22 +68,10 @@ namespace Tmds.DBus.SourceGenerator
 
         private static LiteralExpressionSyntax MakeLiteralExpression(int literal) => LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(literal));
 
-        private static bool InheritsFrom(ITypeSymbol? symbol, ISymbol? type)
-        {
-            ITypeSymbol? baseType = symbol?.BaseType;
-            while (baseType is not null)
-            {
-                if (SymbolEqualityComparer.Default.Equals(baseType, type))
-                    return true;
-
-                baseType = baseType.BaseType;
-            }
-
-            return false;
-        }
-
         private static SyntaxTokenList GetAccessibilityModifiers(SyntaxTokenList modifiers) => TokenList(
             modifiers.Where(static x =>
                 x.IsKind(SyntaxKind.PublicKeyword) || x.IsKind(SyntaxKind.InternalKeyword) || x.IsKind(SyntaxKind.PrivateKeyword) || x.IsKind(SyntaxKind.ProtectedKeyword)));
+
+        private static string TupleOf(IEnumerable<string> elements) => $"({string.Join(", ", elements)})";
     }
 }

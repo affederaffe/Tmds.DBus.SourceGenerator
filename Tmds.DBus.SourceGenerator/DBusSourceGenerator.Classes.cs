@@ -25,10 +25,10 @@ namespace Tmds.DBus.SourceGenerator
                             ConstructorDeclaration("DBusInterfaceAttribute")
                                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                                 .AddParameterListParameters(
-                                    Parameter(Identifier("serviceName")).WithType(PredefinedType(Token(SyntaxKind.StringKeyword))))
+                                    Parameter(Identifier("path")).WithType(PredefinedType(Token(SyntaxKind.StringKeyword))))
                                 .WithBody(
-                                    Block().AddStatements(MakeAssignmentExpressionStatement("ServiceName", "serviceName"))),
-                            MakeGetOnlyProperty(PredefinedType(Token(SyntaxKind.StringKeyword)), "ServiceName", Token(SyntaxKind.PublicKeyword)))));
+                                    Block(MakeAssignmentExpressionStatement("Path", "path"))),
+                            MakeGetOnlyProperty(PredefinedType(Token(SyntaxKind.StringKeyword)), "Path", Token(SyntaxKind.PublicKeyword)))));
 
         private static CompilationUnitSyntax MakePropertyChangesClass() => MakeCompilationUnit(
             NamespaceDeclaration(IdentifierName("Tmds.DBus.SourceGenerator"))

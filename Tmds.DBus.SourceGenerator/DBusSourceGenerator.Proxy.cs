@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -8,33 +7,25 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
-using Tmds.DBus.Protocol;
-
 
 namespace Tmds.DBus.SourceGenerator
 {
     public partial class DBusSourceGenerator
     {
-        private static readonly Dictionary<string, string> _readMethodForSignature = new();
-        private static readonly Dictionary<string, string> _writeMethodForSignature = new();
-
-        private static TypeDeclarationSyntax? GenerateProxy(SemanticModel semanticModel, TypeDeclarationSyntax declaration, AttributeData attributeData)
+        private TypeDeclarationSyntax GenerateProxy(TypeDeclarationSyntax declaration, DBusInterface dBusInterface)
         {
-            if (attributeData.ConstructorArguments.Length != 1 || attributeData.ConstructorArguments[0].Value is not string @interface)
-                return null;
-
             ClassDeclarationSyntax cl = ClassDeclaration(declaration.Identifier)
-                .WithModifiers(GetAccessibilityModifiers(declaration.Modifiers));
+                .WithModifiers(declaration.Modifiers);
 
-            FieldDeclarationSyntax interfaceConst = MakePrivateStringConst("Interface", @interface, PredefinedType(Token(SyntaxKind.StringKeyword)));
-            FieldDeclarationSyntax connectionField = MakePrivateReadOnlyField("_connection", ParseTypeName(nameof(Connection)));
+            FieldDeclarationSyntax interfaceConst = MakePrivateStringConst("Interface", dBusInterface.Name!, PredefinedType(Token(SyntaxKind.StringKeyword)));
+            FieldDeclarationSyntax connectionField = MakePrivateReadOnlyField("_connection", ParseTypeName("Connection"));
             FieldDeclarationSyntax destinationField = MakePrivateReadOnlyField("_destination", PredefinedType(Token(SyntaxKind.StringKeyword)));
             FieldDeclarationSyntax pathField = MakePrivateReadOnlyField("_path", PredefinedType(Token(SyntaxKind.StringKeyword)));
 
             ConstructorDeclarationSyntax ctor = ConstructorDeclaration(declaration.Identifier)
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(
-                    Parameter(Identifier("connection")).WithType(ParseTypeName(nameof(Connection))),
+                    Parameter(Identifier("connection")).WithType(ParseTypeName("Connection")),
                     Parameter(Identifier("destination")).WithType(PredefinedType(Token(SyntaxKind.StringKeyword))),
                     Parameter(Identifier("path")).WithType(PredefinedType(Token(SyntaxKind.StringKeyword))))
                 .WithBody(
@@ -45,102 +36,61 @@ namespace Tmds.DBus.SourceGenerator
 
             cl = cl.AddMembers(interfaceConst, connectionField, destinationField, pathField, ctor);
 
-            MethodDeclarationSyntax[] methodDeclarations = declaration.Members.OfType<MethodDeclarationSyntax>().ToArray();
-
-            IEnumerable<MethodDeclarationSyntax> methods = methodDeclarations.Where(static x => !x.Identifier.Text.StartsWith("Watch", StringComparison.Ordinal));
-            cl = AddMethods(cl, semanticModel, methods);
-
-            IEnumerable<MethodDeclarationSyntax> signals = methodDeclarations.Where(static x => x.Identifier.Text.StartsWith("Watch", StringComparison.Ordinal));
-            cl = AddSignals(cl, semanticModel, signals);
-
-            ClassDeclarationSyntax? properties = declaration.Members.OfType<ClassDeclarationSyntax>()
-                .FirstOrDefault(static x => x.Identifier.Text.EndsWith("Properties", StringComparison.Ordinal));
-            if (properties is not null)
-                cl = AddProperties(cl, semanticModel, properties);
+            if (dBusInterface.Methods is not null)
+                cl = AddMethods(cl, dBusInterface.Methods);
+            if (dBusInterface.Properties is not null)
+                cl = AddProperties(cl, dBusInterface);
 
             return cl;
         }
 
-        private static ClassDeclarationSyntax AddMethods(ClassDeclarationSyntax cl, SemanticModel semanticModel, IEnumerable<MethodDeclarationSyntax> methodDeclarations)
+        private ClassDeclarationSyntax AddMethods(ClassDeclarationSyntax cl, IEnumerable<DBusMethod>? methods) => methods is null ? cl : methods.Aggregate(cl, AddMethod);
+
+        private ClassDeclarationSyntax AddMethod(ClassDeclarationSyntax cl, DBusMethod dBusMethod)
         {
-            foreach (MethodDeclarationSyntax methodDeclaration in methodDeclarations)
-            {
-                string methodName = methodDeclaration.Identifier.Text.Substring(0, methodDeclaration.Identifier.Text.Length - 5);
-                string createMethodIdentifier = $"Create{methodName}Message";
+            string createMethodIdentifier = $"Create{dBusMethod.Name}Message";
+                DBusArgument[]? inArgs = dBusMethod.Arguments?.Where(static m => m.Direction is null or "in").ToArray();
+                DBusArgument[]? outArgs = dBusMethod.Arguments?.Where(static m => m.Direction == "out").ToArray();
 
-                BlockSyntax createMessageBody = Block().AddStatements(
-                    LocalDeclarationStatement(VariableDeclaration(ParseTypeName(nameof(MessageWriter)),
-                        SingletonSeparatedList(
-                            VariableDeclarator("writer")
-                                .WithInitializer(EqualsValueClause(
-                                    InvocationExpression(
-                                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("_connection"), IdentifierName(nameof(Connection.GetMessageWriter)))))))))
-                    .WithUsingKeyword(Token(SyntaxKind.UsingKeyword)),
-                    ExpressionStatement(
-                        InvocationExpression(
-                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("writer"), IdentifierName(nameof(MessageWriter.WriteMethodCallHeader))))
-                            .AddArgumentListArguments(
-                                Argument(IdentifierName("_destination")),
-                                Argument(IdentifierName("_path")),
-                                Argument(IdentifierName("Interface")),
-                                Argument(MakeLiteralExpression(methodName)),
-                                Argument(MakeLiteralExpression(ParseSignature(semanticModel, methodDeclaration))))));
+                string returnType = ParseTaskReturnType(outArgs);
 
-                foreach (ParameterSyntax parameter in methodDeclaration.ParameterList.Parameters)
-                {
-                    if (parameter.Type is null)
-                        throw new ArgumentException("Cannot parse parameter.");
-                    string? writeMethod = ParseWriteMethod(semanticModel, parameter);
-                    if (writeMethod is null)
-                        throw new Exception($"WriteMethod is null {parameter.Type}");
-                    createMessageBody = createMessageBody.AddStatements(
-                        ExpressionStatement(
+                ArgumentListSyntax args = ArgumentList(
+                    SingletonSeparatedList(
+                        Argument(
                             InvocationExpression(
-                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("writer"), IdentifierName(writeMethod)))
-                                .AddArgumentListArguments(Argument(IdentifierName(parameter.Identifier)))));
-                }
+                                IdentifierName(createMethodIdentifier)))));
 
-                createMessageBody = createMessageBody.AddStatements(
-                    ReturnStatement(
-                        InvocationExpression(
-                            MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("writer"),
-                                IdentifierName(nameof(MessageWriter.CreateMessage))))));
+                if (outArgs?.Length > 0)
+                    args = args.AddArguments(
+                        Argument(
+                            MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("ReaderExtensions"), IdentifierName(GetOrAddReadMessageMethod(outArgs)))));
 
-                string? returnType = ParseReadMethod(semanticModel, methodDeclaration.ReturnType);
-
-                ParenthesizedLambdaExpressionSyntax? messageValueReaderLambda = returnType is null
-                    ? null
-                    : ParenthesizedLambdaExpression()
-                        .AddParameterListParameters(
-                            Parameter(Identifier("message")).WithType(ParseTypeName(nameof(Message))),
-                            Parameter(Identifier("state")).WithType(NullableType(PredefinedType(Token(SyntaxKind.ObjectKeyword)))))
-                        . WithExpressionBody(
-                            InvocationExpression(
-                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, InvocationExpression(
-                                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("message"), IdentifierName(nameof(Message.GetBodyReader)))),
-                                    IdentifierName(returnType))));
-
-                ArgumentListSyntax args = ArgumentList(SingletonSeparatedList(Argument(InvocationExpression(IdentifierName(createMethodIdentifier)))));
-                if (messageValueReaderLambda is not null)
-                    args = args.AddArguments(Argument(messageValueReaderLambda));
-
-                MethodDeclarationSyntax proxyMethod = MethodDeclaration(methodDeclaration.ReturnType, methodDeclaration.Identifier)
-                    .WithModifiers(GetAccessibilityModifiers(methodDeclaration.Modifiers))
-                    .WithParameterList(methodDeclaration.ParameterList)
-                    .WithBody(
-                        Block(
-                            ReturnStatement(
+                BlockSyntax createMessageBody = MakeCreateMessageBody(IdentifierName("Interface"), dBusMethod.Name!, ParseSignature(inArgs));
+                if (inArgs is not null)
+                    createMessageBody = createMessageBody.WithStatements(
+                        createMessageBody.Statements.AddRange(
+                            inArgs.Select(static (x, i) => ExpressionStatement(
                                 InvocationExpression(
-                                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("_connection"),
-                                            IdentifierName(nameof(Connection.CallMethodAsync))))
-                                    .WithArgumentList(args)),
-                            LocalFunctionStatement(ParseTypeName(nameof(MessageBuffer)), createMethodIdentifier)
-                                .WithBody(createMessageBody)));
+                                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("writer"),
+                                            IdentifierName($"Write{ParseReadWriteMethod(x)}")))
+                                    .AddArgumentListArguments(
+                                        Argument(IdentifierName(x.Name ?? $"arg{i}")))))));
+                createMessageBody = AddCreateMessageBodyReturnStatement(createMessageBody);
 
-                cl = cl.AddMembers(proxyMethod);
-            }
+                MethodDeclarationSyntax proxyMethod = MethodDeclaration(ParseTypeName(returnType), $"{dBusMethod.Name}Async")
+                    .WithModifiers(GetAccessibilityModifiers(cl.Modifiers));
 
-            return cl;
+                if (inArgs is not null)
+                    proxyMethod = proxyMethod
+                        .WithParameterList(
+                            ParameterList(
+                                SeparatedList(
+                                    inArgs.Select(static (x, i) =>
+                                        Parameter(Identifier(x.Name ?? $"arg{i}")).WithType(ParseTypeName(x.DotNetType))))));
+
+                proxyMethod = proxyMethod.WithBody(MakeCallMethodReturnBody(args, createMessageBody, createMethodIdentifier));
+
+                return cl.AddMembers(proxyMethod);
         }
 
         private static ClassDeclarationSyntax AddSignals(ClassDeclarationSyntax cl, SemanticModel semanticModel, IEnumerable<MethodDeclarationSyntax> signals)
@@ -150,124 +100,283 @@ namespace Tmds.DBus.SourceGenerator
             return cl;
         }
 
-        private static ClassDeclarationSyntax AddProperties(ClassDeclarationSyntax cl, SemanticModel semanticModel, ClassDeclarationSyntax propertiesDeclaration)
+        private ClassDeclarationSyntax AddProperties(ClassDeclarationSyntax cl, DBusInterface dBusInterface)
         {
-            foreach (PropertyDeclarationSyntax propertyDeclaration in propertiesDeclaration.Members.OfType<PropertyDeclarationSyntax>())
-            {
-                
-            }
+            if (dBusInterface.Properties?.Length == 0)
+                return cl;
 
-            return AddGetAllMethod(cl, semanticModel, propertiesDeclaration);
+            cl = dBusInterface.Properties!.Aggregate(cl, (current, dBusProperty) => dBusProperty.Access switch
+            {
+                "read" => current.AddMembers(CreateGetMethod(dBusProperty)),
+                "write" => current.AddMembers(CreateSetMethod(dBusProperty)),
+                "readwrite" => current.AddMembers(CreateGetMethod(dBusProperty), CreateSetMethod(dBusProperty)),
+                _ => current
+            });
+
+            cl = AddGetAllMethod(cl, dBusInterface);
+            cl = AddPropertiesClass(cl, dBusInterface);
+
+            return cl;
         }
 
-        private static ClassDeclarationSyntax AddGetAllMethod(ClassDeclarationSyntax cl, SemanticModel semanticModel, ClassDeclarationSyntax propertiesDeclaration)
+        private MethodDeclarationSyntax CreateGetMethod(DBusProperty dBusProperty)
         {
-            BlockSyntax createGetAllMessageBody = Block().AddStatements(
-                LocalDeclarationStatement(VariableDeclaration(ParseTypeName(nameof(MessageWriter)),
-                        SingletonSeparatedList(
-                            VariableDeclarator("writer")
-                                .WithInitializer(EqualsValueClause(
-                                    InvocationExpression(
-                                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("_connection"), IdentifierName(nameof(Connection.GetMessageWriter)))))))))
-                    .WithUsingKeyword(Token(SyntaxKind.UsingKeyword)),
-                ExpressionStatement(
-                    InvocationExpression(
-                            MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("writer"), IdentifierName(nameof(MessageWriter.WriteMethodCallHeader))))
-                        .AddArgumentListArguments(
-                            Argument(IdentifierName("_destination")),
-                            Argument(IdentifierName("_path")),
-                            Argument(MakeLiteralExpression("org.freedesktop.DBus.Properties")),
-                            Argument(MakeLiteralExpression("GetAll")),
-                            Argument(MakeLiteralExpression("s")))),
-                ExpressionStatement(
-                    InvocationExpression(
-                            MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("writer"), IdentifierName("WriteString")))
-                        .AddArgumentListArguments(Argument(IdentifierName("Interface")))),
-                ReturnStatement(
-                    InvocationExpression(
-                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("writer"),
-                            IdentifierName(nameof(MessageWriter.CreateMessage))))));
+            string createMethodIdentifier = $"CreateGet{dBusProperty.Name}Message";
+
+            BlockSyntax createGetMessageBody = MakeCreateMessageBody(MakeLiteralExpression("org.freedesktop.DBus.Properties"), "Get", "ss")
+                .AddStatements(
+                    ExpressionStatement(
+                        InvocationExpression(
+                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("writer"), IdentifierName("WriteString")))
+                            .AddArgumentListArguments(Argument(IdentifierName("Interface")))),
+                    ExpressionStatement(
+                        InvocationExpression(
+                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("writer"), IdentifierName("WriteString")))
+                            .AddArgumentListArguments(Argument(MakeLiteralExpression(dBusProperty.Name!)))));
+            createGetMessageBody = AddCreateMessageBodyReturnStatement(createGetMessageBody);
+
+            ArgumentListSyntax args = ArgumentList()
+                .AddArguments(
+                    Argument(
+                        InvocationExpression(
+                            IdentifierName(createMethodIdentifier))),
+                        Argument(
+                            MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("ReaderExtensions"), IdentifierName(GetOrAddReadMessageMethod(dBusProperty)))));
+
+                return MethodDeclaration(ParseTypeName(ParseTaskReturnType(dBusProperty)), $"Get{dBusProperty.Name}Async")
+                .AddModifiers(Token(SyntaxKind.PublicKeyword))
+                .WithBody(
+                    MakeCallMethodReturnBody(args, createGetMessageBody, createMethodIdentifier));
+        }
+
+        private static MethodDeclarationSyntax CreateSetMethod(DBusProperty dBusProperty)
+        {
+            BlockSyntax createGetMessageBody = MakeCreateMessageBody(MakeLiteralExpression("org.freedesktop.DBus.Properties"), "Set", "ssv")
+                .AddStatements(
+                    ExpressionStatement(
+                        InvocationExpression(
+                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("writer"), IdentifierName("WriteString")))
+                            .AddArgumentListArguments(Argument(IdentifierName("Interface")))),
+                    ExpressionStatement(
+                        InvocationExpression(
+                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("writer"), IdentifierName("WriteString")))
+                            .AddArgumentListArguments(Argument(MakeLiteralExpression(dBusProperty.Name!)))),
+                    ExpressionStatement(
+                        InvocationExpression(
+                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("writer"), IdentifierName("WriteVariant")))
+                            .AddArgumentListArguments(Argument(IdentifierName("value")))));
+            createGetMessageBody = AddCreateMessageBodyReturnStatement(createGetMessageBody);
+
+            return MethodDeclaration(ParseTypeName(dBusProperty.DotNetType), $"Get{dBusProperty.Name}Async")
+                .AddModifiers(Token(SyntaxKind.PublicKeyword))
+                .AddParameterListParameters(
+                    Parameter(Identifier("value")).WithType(ParseTypeName(dBusProperty.DotNetType)))
+                .WithBody(createGetMessageBody);
+        }
+
+        private static ClassDeclarationSyntax AddGetAllMethod(ClassDeclarationSyntax cl, DBusInterface dBusInterface)
+        {
+            BlockSyntax createGetAllMessageBody = MakeCreateMessageBody(MakeLiteralExpression("org.freedesktop.DBus.Properties"), "GetAll", "s")
+                .AddStatements(
+                    ExpressionStatement(
+                        InvocationExpression(
+                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("writer"), IdentifierName("WriteString")))
+                            .AddArgumentListArguments(Argument(IdentifierName("Interface")))));
+
+            createGetAllMessageBody = AddCreateMessageBodyReturnStatement(createGetAllMessageBody);
 
             SyntaxList<SwitchSectionSyntax> switchSections = List<SwitchSectionSyntax>();
-            foreach (PropertyDeclarationSyntax propertyDeclaration in propertiesDeclaration.Members.OfType<PropertyDeclarationSyntax>())
-            {
-                IPropertySymbol? declaredProperty = semanticModel.GetDeclaredSymbol(propertyDeclaration);
-                if (declaredProperty is null) continue;
-                string signature = ParseTypeForSignature(declaredProperty.Type, semanticModel);
-                string readMethod = $"Read{ParseTypeForReadWriteMethod(declaredProperty.Type, semanticModel)}";
-                switchSections = switchSections.Add(
-                    SwitchSection()
-                        .AddLabels(CaseSwitchLabel(MakeLiteralExpression(declaredProperty.Name)))
-                        .AddStatements(
-                            ExpressionStatement(
-                                InvocationExpression(
-                                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("reader"), IdentifierName(nameof(Reader.ReadSignature))))
-                                .AddArgumentListArguments(Argument(MakeLiteralExpression(signature)))),
-                            ExpressionStatement(
-                                AssignmentExpression(SyntaxKind.SimpleAssignmentExpression,
-                                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("props"), IdentifierName(declaredProperty.Name)),
-                                    InvocationExpression(
-                                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("reader"), IdentifierName(readMethod))))),
-                            BreakStatement()));
-            }
+            switchSections = dBusInterface.Properties!.Aggregate(switchSections, static (current, dBusProperty) => current.Add(SwitchSection()
+                .AddLabels(
+                    CaseSwitchLabel(
+                        MakeLiteralExpression(dBusProperty.Name!)))
+                .AddStatements(
+                    ExpressionStatement(
+                        InvocationExpression(
+                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("reader"), IdentifierName("ReadSignature")))
+                    .AddArgumentListArguments(
+                        Argument(MakeLiteralExpression(dBusProperty.Type!)))),
+                    ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression,
+                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("props"), IdentifierName(dBusProperty.Name!)),
+                    InvocationExpression(
+                            MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("reader"), IdentifierName($"Read{ParseReadWriteMethod(dBusProperty)}"))))),
+                    BreakStatement())));
+
+            string propertiesType = $"{cl.Identifier.Text}Properties";
 
             ParenthesizedLambdaExpressionSyntax messageValueReaderLambda = ParenthesizedLambdaExpression()
                 .AddParameterListParameters(
-                    Parameter(Identifier("message")).WithType(ParseTypeName(nameof(Message))),
+                    Parameter(Identifier("message")).WithType(ParseTypeName("Message")),
                     Parameter(Identifier("state")).WithType(NullableType(PredefinedType(Token(SyntaxKind.ObjectKeyword)))))
                 .WithBody(
                     Block(
-                        LocalDeclarationStatement(VariableDeclaration(ParseTypeName(nameof(Reader)))
+                        LocalDeclarationStatement(VariableDeclaration(ParseTypeName("Reader"))
                             .AddVariables(
                                 VariableDeclarator("reader")
                                     .WithInitializer(
                                         EqualsValueClause(
                                             InvocationExpression(
                                                 MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("message"),
-                                                    IdentifierName(nameof(Message.GetBodyReader)))))))),
-                        LocalDeclarationStatement(VariableDeclaration(ParseTypeName(propertiesDeclaration.Identifier.Text))
+                                                    IdentifierName("GetBodyReader"))))))),
+                        LocalDeclarationStatement(VariableDeclaration(ParseTypeName(propertiesType))
                             .AddVariables(
                                 VariableDeclarator("props")
                                     .WithInitializer(
                                         EqualsValueClause(
                                             InvocationExpression(
-                                                ObjectCreationExpression(ParseTypeName(propertiesDeclaration.Identifier.Text))))))),
-                        LocalDeclarationStatement(VariableDeclaration(ParseTypeName(nameof(ArrayEnd)))
+                                                ObjectCreationExpression(ParseTypeName(propertiesType))))))),
+                        LocalDeclarationStatement(VariableDeclaration(ParseTypeName("ArrayEnd"))
                             .AddVariables(
                                 VariableDeclarator("headersEnd")
                                     .WithInitializer(
                                         EqualsValueClause(
                                             InvocationExpression(
-                                                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("reader"), IdentifierName(nameof(Reader.ReadArrayStart))))
+                                                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("reader"), IdentifierName("ReadArrayStart")))
                                                 .AddArgumentListArguments(
-                                                    Argument(MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName(nameof(DBusType)), IdentifierName(nameof(DBusType.Struct))))))))),
+                                                    Argument(MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("DBusType"), IdentifierName("Struct")))))))),
                         WhileStatement(
                             InvocationExpression(
-                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("reader"), IdentifierName(nameof(Reader.HasNext))))
+                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("reader"), IdentifierName("HasNext")))
                                 .AddArgumentListArguments(Argument(IdentifierName("headersEnd"))),
                             Block(
                                 SwitchStatement(
                                     InvocationExpression(
-                                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("reader"), IdentifierName(nameof(Reader.ReadString)))))
+                                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("reader"), IdentifierName("ReadString"))))
                                     .WithSections(switchSections))),
                         ReturnStatement(IdentifierName("props"))));
 
             return cl.AddMembers(
-                MethodDeclaration(ParseTypeName($"Task<{propertiesDeclaration.Identifier.Text}>"), "GetAllAsync")
-                    .WithModifiers(GetAccessibilityModifiers(propertiesDeclaration.Modifiers))
+                MethodDeclaration(ParseTypeName($"Task<{propertiesType}>"), "GetAllAsync")
+                    .AddModifiers(Token(SyntaxKind.PublicKeyword))
                     .WithBody(
                         Block(
                             ReturnStatement(
                                 InvocationExpression(
-                                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("_connection"), IdentifierName(nameof(Connection.CallMethodAsync))))
+                                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("_connection"), IdentifierName("CallMethodAsync")))
                                     .AddArgumentListArguments(
                                         Argument(InvocationExpression(IdentifierName("CreateGetAllMessage"))),
                                         Argument(messageValueReaderLambda))),
-                            LocalFunctionStatement(ParseTypeName(nameof(MessageBuffer)), "CreateGetAllMessage")
-                                .WithBody(createGetAllMessageBody))
-                        )
-                    )
-            ;
+                            LocalFunctionStatement(ParseTypeName("MessageBuffer"), "CreateGetAllMessage")
+                                .WithBody(createGetAllMessageBody))));
+        }
+
+        private static ClassDeclarationSyntax AddPropertiesClass(ClassDeclarationSyntax cl, DBusInterface dBusInterface)
+        {
+            ClassDeclarationSyntax record = ClassDeclaration($"{cl.Identifier.Text}Properties")
+                .AddModifiers(Token(SyntaxKind.PublicKeyword));
+
+            record = dBusInterface.Properties!.Aggregate(record, static (current, property)
+                => current.AddMembers(MakeGetSetProperty(ParseTypeName(property.DotNetType), property.Name!, Token(SyntaxKind.PublicKeyword))));
+
+            return cl.AddMembers(record);
+        }
+
+        private static BlockSyntax MakeCallMethodReturnBody(ArgumentListSyntax args, BlockSyntax createMessageBody, string createMethodIdentifier) =>
+            Block(
+                ReturnStatement(
+                    InvocationExpression(
+                            MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("_connection"),
+                                IdentifierName("CallMethodAsync")))
+                        .WithArgumentList(args)),
+                LocalFunctionStatement(ParseTypeName("MessageBuffer"), createMethodIdentifier)
+                    .WithBody(createMessageBody));
+
+        private static BlockSyntax MakeCreateMessageBody(ExpressionSyntax interfaceExpression, string methodName, string? signature)
+        {
+            ArgumentListSyntax args = ArgumentList()
+                .AddArguments(
+                    Argument(IdentifierName("_destination")),
+                    Argument(IdentifierName("_path")),
+                    Argument(interfaceExpression),
+                    Argument(MakeLiteralExpression(methodName)));
+
+            if (signature is not null)
+                args = args.AddArguments(Argument(MakeLiteralExpression(signature)));
+
+            return Block(
+                LocalDeclarationStatement(VariableDeclaration(ParseTypeName("MessageWriter"),
+                        SingletonSeparatedList(
+                            VariableDeclarator("writer")
+                                .WithInitializer(EqualsValueClause(
+                                    InvocationExpression(
+                                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("_connection"),
+                                            IdentifierName("GetMessageWriter"))))))))
+                    .WithUsingKeyword(Token(SyntaxKind.UsingKeyword)),
+                ExpressionStatement(
+                    InvocationExpression(
+                            MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("writer"),
+                                IdentifierName("WriteMethodCallHeader")))
+                        .WithArgumentList(args)));
+        }
+
+        private static BlockSyntax AddCreateMessageBodyReturnStatement(BlockSyntax createMessageBody) => createMessageBody.AddStatements(
+            ReturnStatement(
+                InvocationExpression(
+                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("writer"),
+                        IdentifierName("CreateMessage")))));
+
+        private string GetOrAddReadMessageMethod(DBusValue dBusValue) => GetOrAddReadMessageMethod(new[] { dBusValue });
+
+        private string GetOrAddReadMessageMethod(IReadOnlyList<DBusValue> dBusValues)
+        {
+            string signature = ParseSignature(dBusValues)!.Replace('{', 'e').Replace("}", null).Replace('(', 'r').Replace(')', 'z');
+            if (_readMethodForSignature.TryGetValue(signature, out string identifier))
+                return identifier;
+
+            identifier = $"ReadMessage_{signature}";
+            string returnType = ParseReturnType(dBusValues)!;
+
+            BlockSyntax block = Block()
+                .AddStatements(
+                    LocalDeclarationStatement(
+                        VariableDeclaration(ParseTypeName("Reader"))
+                            .AddVariables(
+                                VariableDeclarator("reader")
+                                    .WithInitializer(
+                                        EqualsValueClause(
+                                            InvocationExpression(
+                                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("message"), IdentifierName("GetBodyReader"))))))));
+
+            if (dBusValues.Count == 1)
+            {
+                block = block.AddStatements(
+                    ReturnStatement(
+                        InvocationExpression(
+                            MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("reader"), IdentifierName($"Read{ParseReadWriteMethod(dBusValues[0])}")))));
+            }
+            else
+            {
+                for (int i = 0; i < dBusValues.Count; i++)
+                {
+                    block = block.AddStatements(
+                        LocalDeclarationStatement(
+                            VariableDeclaration(ParseTypeName(dBusValues[i].DotNetType))
+                                .AddVariables(
+                                    VariableDeclarator($"arg{i}")
+                                        .WithInitializer(
+                                            EqualsValueClause(
+                                                InvocationExpression(
+                                                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("reader"), IdentifierName($"Read{ParseReadWriteMethod(dBusValues[i])}"))))))));
+                }
+
+                block = block.AddStatements(
+                    ReturnStatement(
+                        TupleExpression(
+                            SeparatedList(
+                                dBusValues.Select(static (_, i) => Argument(IdentifierName($"arg{i}")))))));
+            }
+
+            _readerExtensions = _readerExtensions.AddMembers(
+                MethodDeclaration(ParseTypeName(returnType), identifier)
+                    .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
+                    .AddParameterListParameters(
+                        Parameter(Identifier("message")).WithType(ParseTypeName("Message")),
+                        Parameter(Identifier("_")).WithType(PredefinedType(Token(SyntaxKind.ObjectKeyword))))
+                    .WithBody(block));
+
+            _readMethodForSignature.Add(signature, identifier);
+
+            return identifier;
         }
     }
 }

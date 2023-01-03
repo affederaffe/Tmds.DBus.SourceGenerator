@@ -1,10 +1,8 @@
-using System.Threading.Tasks;
+/*using System.Threading.Tasks;
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-
-using Tmds.DBus.Protocol;
 
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
@@ -17,18 +15,18 @@ namespace Tmds.DBus.SourceGenerator
         {
             ClassDeclarationSyntax cl = ClassDeclaration(declaration.Identifier)
                 .WithModifiers(declaration.Modifiers)
-                .AddBaseListTypes(SimpleBaseType(ParseTypeName(nameof(IMethodHandler))));
+                .AddBaseListTypes(SimpleBaseType(ParseTypeName("IMethodHandler")));
 
-            MethodDeclarationSyntax runMethodHandlerSynchronously = MethodDeclaration(ParseTypeName("bool"), Identifier(nameof(IMethodHandler.RunMethodHandlerSynchronously)))
+            MethodDeclarationSyntax runMethodHandlerSynchronously = MethodDeclaration(ParseTypeName("bool"), Identifier("IMethodHandler.RunMethodHandlerSynchronously)))
                 .AddParameterListParameters(
-                    Parameter(Identifier("message")).WithType(ParseTypeName(nameof(Message))))
+                    Parameter(Identifier("message")).WithType(ParseTypeName("Message))))
                 .WithExpressionBody(
                     ArrowExpressionClause(
                         LiteralExpression(SyntaxKind.TrueLiteralExpression)));
 
-            MethodDeclarationSyntax handleMethodAsync = MethodDeclaration(ParseTypeName(nameof(ValueTask)), Identifier(nameof(IMethodHandler.HandleMethodAsync)))
+            MethodDeclarationSyntax handleMethodAsync = MethodDeclaration(ParseTypeName("ValueTask)), Identifier("IMethodHandler.HandleMethodAsync)))
                     .AddParameterListParameters(
-                        Parameter(Identifier("context")).WithType(ParseTypeName(nameof(MethodContext))))
+                        Parameter(Identifier("context")).WithType(ParseTypeName("MethodContext))))
                     .WithBody(
                         Block(
                             IfStatement(
@@ -36,7 +34,7 @@ namespace Tmds.DBus.SourceGenerator
                                     SyntaxKind.EqualsExpression,
                                     MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
                                         MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
-                                            IdentifierName("context"), IdentifierName(nameof(MethodContext.Request))), IdentifierName(nameof(Message.InterfaceAsString))),
+                                            IdentifierName("context"), IdentifierName("MethodContext.Request))), IdentifierName("Message.InterfaceAsString))),
                                     MakeLiteralExpression(interfaceName)),
                                 ReturnStatement(
                                     LiteralExpression(
@@ -47,10 +45,10 @@ namespace Tmds.DBus.SourceGenerator
                                         SeparatedList<ArgumentSyntax>(
                                             new SyntaxNodeOrToken[]{
                                                 Argument(
-                                                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("request"), IdentifierName(nameof(Message.MemberAsString)))),
+                                                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("request"), IdentifierName("Message.MemberAsString)))),
                                                 Token(SyntaxKind.CommaToken),
                                                 Argument(
-                                                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("request"), IdentifierName(nameof(Message.SignatureAsString))))})))
+                                                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("request"), IdentifierName("Message.SignatureAsString))))})))
                                 .AddSections()));
 
 
@@ -58,3 +56,4 @@ namespace Tmds.DBus.SourceGenerator
         }
     }
 }
+*/
