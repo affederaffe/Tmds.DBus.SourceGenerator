@@ -507,7 +507,7 @@ namespace Tmds.DBus.SourceGenerator
                     .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
                     .AddParameterListParameters(
                         Parameter(Identifier("message")).WithType(ParseTypeName("Message")),
-                        Parameter(Identifier("_")).WithType(PredefinedType(Token(SyntaxKind.ObjectKeyword))))
+                        Parameter(Identifier("_")).WithType(NullableType(PredefinedType(Token(SyntaxKind.ObjectKeyword)))))
                     .WithBody(block));
 
             _readMethodForSignature.Add(signature, identifier);
