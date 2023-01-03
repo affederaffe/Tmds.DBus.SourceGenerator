@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -88,19 +87,18 @@ namespace Tmds.DBus.SourceGenerator
                 return proxyMethod.WithBody(MakeCallMethodReturnBody(args, createMessageBody, createMethodIdentifier));
         }
 
-        private static ClassDeclarationSyntax AddSignals(ClassDeclarationSyntax cl, IEnumerable<DBusSignal>? dBusSignals) =>
-            dBusSignals is null ? cl : dBusSignals.Aggregate(cl, static (current, dBusSignal) => current.AddMembers(MakeSignal(dBusSignal)));
+        private ClassDeclarationSyntax AddSignals(ClassDeclarationSyntax cl, IEnumerable<DBusSignal>? dBusSignals) =>
+            dBusSignals is null ? cl : dBusSignals.Aggregate(cl, (current, dBusSignal) => current.AddMembers(MakeSignal(dBusSignal)));
 
-        private static MethodDeclarationSyntax MakeSignal(DBusSignal dBusSignal)
+        private MethodDeclarationSyntax MakeSignal(DBusSignal dBusSignal)
         {
-            string? returnType = ParseReturnType(dBusSignal.Arguments);
+            DBusArgument[]? outArgs = dBusSignal.Arguments?.Where(static x => x.Direction is null or "out").ToArray();
+            string? returnType = ParseReturnType(outArgs);
 
             ParameterListSyntax parameters = ParameterList();
 
             parameters = returnType is not null
                 ? parameters.AddParameters(
-                    Parameter(Identifier("reader"))
-                        .WithType(ParseTypeName($"MessageValueReader<{returnType}>")),
                     Parameter(Identifier("handler"))
                         .WithType(ParseTypeName($"Action<Exception?, {returnType}>")))
                 : parameters.AddParameters(
@@ -116,8 +114,9 @@ namespace Tmds.DBus.SourceGenerator
                 .AddArguments(Argument(IdentifierName("_connection")),
                     Argument(IdentifierName("rule")));
 
-            if (returnType is not null)
-                arguments = arguments.AddArguments(Argument(IdentifierName("reader")));
+            if (outArgs is not null)
+                arguments = arguments.AddArguments(
+                    Argument(MakeMemberAccessExpression("ReaderExtensions", GetOrAddReadMessageMethod(outArgs))));
 
             arguments = arguments.AddArguments(
                 Argument(IdentifierName("handler")),
