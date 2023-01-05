@@ -48,43 +48,39 @@ namespace Tmds.DBus.SourceGenerator
         private MethodDeclarationSyntax MakeMethod(DBusMethod dBusMethod)
         {
             string createMethodIdentifier = $"Create{dBusMethod.Name}Message";
-                DBusArgument[]? inArgs = dBusMethod.Arguments?.Where(static m => m.Direction is null or "in").ToArray();
-                DBusArgument[]? outArgs = dBusMethod.Arguments?.Where(static m => m.Direction == "out").ToArray();
+            DBusArgument[]? inArgs = dBusMethod.Arguments?.Where(static m => m.Direction is null or "in").ToArray();
+            DBusArgument[]? outArgs = dBusMethod.Arguments?.Where(static m => m.Direction == "out").ToArray();
 
-                string returnType = ParseTaskReturnType(outArgs);
+            string returnType = ParseTaskReturnType(outArgs);
 
-                ArgumentListSyntax args = ArgumentList(
-                    SingletonSeparatedList(
-                        Argument(
-                            InvocationExpression(
-                                IdentifierName(createMethodIdentifier)))));
+            ArgumentListSyntax args = ArgumentList(
+                SingletonSeparatedList(
+                    Argument(
+                        InvocationExpression(
+                            IdentifierName(createMethodIdentifier)))));
 
-                if (outArgs?.Length > 0)
-                    args = args.AddArguments(
-                        Argument(
-                            MakeMemberAccessExpression("ReaderExtensions", GetOrAddReadMessageMethod(outArgs))));
+            if (outArgs?.Length > 0)
+                args = args.AddArguments(
+                    Argument(
+                        MakeMemberAccessExpression("ReaderExtensions", GetOrAddReadMessageMethod(outArgs))));
 
-                ExpressionStatementSyntax[] statements = inArgs?.Select(static (x, i) => ExpressionStatement(
-                    InvocationExpression(
-                            MakeMemberAccessExpression("writer", $"Write{ParseReadWriteMethod(x)}"))
-                        .AddArgumentListArguments(
-                            Argument(IdentifierName(x.Name ?? $"arg{i}")))))
-                    .ToArray() ?? Array.Empty<ExpressionStatementSyntax>();
+            ExpressionStatementSyntax[] statements = inArgs?.Select(static (x, i) => ExpressionStatement(
+                InvocationExpression(
+                        MakeMemberAccessExpression("writer", $"Write{ParseReadWriteMethod(x)}"))
+                    .AddArgumentListArguments(
+                        Argument(IdentifierName(x.Name ?? $"arg{i}")))))
+                .ToArray() ?? Array.Empty<ExpressionStatementSyntax>();
 
-                BlockSyntax createMessageBody = MakeCreateMessageBody(IdentifierName("Interface"), dBusMethod.Name!, ParseSignature(inArgs), statements);
+            BlockSyntax createMessageBody = MakeCreateMessageBody(IdentifierName("Interface"), dBusMethod.Name!, ParseSignature(inArgs), statements);
 
-                MethodDeclarationSyntax proxyMethod = MethodDeclaration(ParseTypeName(returnType), $"{dBusMethod.Name}Async")
-                    .AddModifiers(Token(SyntaxKind.PublicKeyword));
+            MethodDeclarationSyntax proxyMethod = MethodDeclaration(ParseTypeName(returnType), $"{dBusMethod.Name}Async")
+                .AddModifiers(Token(SyntaxKind.PublicKeyword));
 
-                if (inArgs is not null)
-                    proxyMethod = proxyMethod
-                        .WithParameterList(
-                            ParameterList(
-                                SeparatedList(
-                                    inArgs.Select(static (x, i) =>
-                                        Parameter(Identifier(x.Name ?? $"arg{i}")).WithType(ParseTypeName(x.DotNetType))))));
+            if (inArgs is not null)
+                proxyMethod = proxyMethod
+                    .WithParameterList(ParseParameterList(inArgs));
 
-                return proxyMethod.WithBody(MakeCallMethodReturnBody(args, createMessageBody, createMethodIdentifier));
+            return proxyMethod.WithBody(MakeCallMethodReturnBody(args, createMessageBody, createMethodIdentifier));
         }
 
         private ClassDeclarationSyntax AddSignals(ClassDeclarationSyntax cl, IEnumerable<DBusSignal>? dBusSignals) =>

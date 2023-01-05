@@ -66,6 +66,9 @@ namespace Tmds.DBus.SourceGenerator
         private static MemberAccessExpressionSyntax MakeMemberAccessExpression(string left, string right) =>
             MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName(left), IdentifierName(right));
 
+        private static MemberAccessExpressionSyntax MakeMemberAccessExpression(string left, string middle, string right) =>
+            MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, MakeMemberAccessExpression(left, middle), IdentifierName(right));
+
         private static LiteralExpressionSyntax MakeLiteralExpression(string literal) => LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(literal));
 
         private static LiteralExpressionSyntax MakeLiteralExpression(int literal) => LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(literal));

@@ -3,6 +3,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+
 
 namespace Tmds.DBus.SourceGenerator
 {
@@ -21,7 +25,7 @@ namespace Tmds.DBus.SourceGenerator
         {
             0 or null => null,
             1 => dBusValues[0].DotNetType,
-            _ => TupleOf(dBusValues.Select(static (x, i) => $"{x.DotNetType} {x.Name ?? $"arg{i}"}"))
+            _ => TupleOf(dBusValues.Select(static (x, i) => $"{x.DotNetType} {x.Name ?? $"Item{i}"}"))
         };
 
         private static string ParseTaskReturnType(DBusValue dBusValue) => ParseTaskReturnType(new[] { dBusValue });
@@ -30,8 +34,14 @@ namespace Tmds.DBus.SourceGenerator
         {
             0 or null => "Task",
             1 => $"Task<{dBusValues[0].DotNetType}>",
-            _ => $"Task<{TupleOf(dBusValues.Select(static (x, i) => $"{x.DotNetType} {x.Name ?? $"arg{i}"}"))}>"
+            _ => $"Task<{TupleOf(dBusValues.Select(static (x, i) => $"{x.DotNetType} {x.Name ?? $"Item{i}"}"))}>"
         };
+
+        private static ParameterListSyntax ParseParameterList(IEnumerable<DBusValue> inArgs) => ParameterList(
+            SeparatedList(
+                inArgs.Select(static (x, i) =>
+                    Parameter(Identifier(x.Name ?? $"arg{i}")).WithType(ParseTypeName(x.DotNetType)))));
+
 
         internal static (string DotnetType, string[] DotnetInnerTypes, DBusType DBusType) ParseDotNetType(string signature) =>
             SignatureReader.Transform<(string, string[], DBusType)>(Encoding.ASCII.GetBytes(signature), MapDBusToDotNet);
