@@ -20,6 +20,8 @@ namespace Tmds.DBus.SourceGenerator
         private Dictionary<string, string> _readMethodForSignature = null!;
         private ClassDeclarationSyntax _readerExtensions = null!;
 
+        private static DiagnosticDescriptor XmlFileNotFound = new("DBusSG", "Xml File not found", "Could not find file '{0}'", "DBus", DiagnosticSeverity.Error, true);
+
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
             _readMethodForSignature = new Dictionary<string, string>();
@@ -68,6 +70,12 @@ namespace Tmds.DBus.SourceGenerator
                     {
                         if (attributeData.ConstructorArguments[0].Value is not string xmlPath) continue;
                         string path = Path.Combine(providers.ProjectPath, xmlPath);
+                        if (!File.Exists(path))
+                        {
+                            productionContext.ReportDiagnostic(Diagnostic.Create(XmlFileNotFound, syntaxContext.TargetNode.GetLocation(), path));
+                            return;
+                        }
+
                         if (xmlSerializer.Deserialize(XmlReader.Create(File.OpenRead(path), xmlReaderSettings)) is not DBusNode dBusNode) continue;
                         if (dBusNode.Interfaces is null) continue;
                         ClassDeclarationSyntax classNode = (ClassDeclarationSyntax)syntaxContext.TargetNode;
@@ -90,6 +98,12 @@ namespace Tmds.DBus.SourceGenerator
                     {
                         if (attributeData.ConstructorArguments[0].Value is not string xmlPath) continue;
                         string path = Path.Combine(providers.ProjectPath, xmlPath);
+                        if (!File.Exists(path))
+                        {
+                            productionContext.ReportDiagnostic(Diagnostic.Create(XmlFileNotFound, syntaxContext.TargetNode.GetLocation(), path));
+                            return;
+                        }
+
                         if (xmlSerializer.Deserialize(XmlReader.Create(File.OpenRead(path), xmlReaderSettings)) is not DBusNode dBusNode) continue;
                         if (dBusNode.Interfaces is null) continue;
                         ClassDeclarationSyntax classNode = (ClassDeclarationSyntax)syntaxContext.TargetNode;
