@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Text;
+using System.Xml;
 using System.Xml.Serialization;
 
 using Microsoft.CodeAnalysis;
@@ -52,13 +53,22 @@ namespace Tmds.DBus.SourceGenerator
             {
                 if (providers.ProjectPath is null) return;
 
+                XmlSerializer xmlSerializer = new(typeof(DBusNode));
+                XmlReaderSettings xmlReaderSettings = new()
+                {
+                    Async = true,
+                    DtdProcessing = DtdProcessing.Ignore,
+                    IgnoreWhitespace = true,
+                    IgnoreComments = true
+                };
+
                 foreach (GeneratorAttributeSyntaxContext syntaxContext in providers.ClassesWithAttribute.Interfaces)
                 {
                     foreach (AttributeData attributeData in syntaxContext.Attributes)
                     {
                         if (attributeData.ConstructorArguments[0].Value is not string xmlPath) continue;
                         string path = Path.Combine(providers.ProjectPath, xmlPath);
-                        if (new XmlSerializer(typeof(DBusNode)).Deserialize(File.OpenRead(path)) is not DBusNode dBusNode) continue;
+                        if (xmlSerializer.Deserialize(XmlReader.Create(File.OpenRead(path), xmlReaderSettings)) is not DBusNode dBusNode) continue;
                         if (dBusNode.Interfaces is null) continue;
                         ClassDeclarationSyntax classNode = (ClassDeclarationSyntax)syntaxContext.TargetNode;
                         INamedTypeSymbol? declaredClass = syntaxContext.SemanticModel.GetDeclaredSymbol(classNode);
@@ -74,13 +84,13 @@ namespace Tmds.DBus.SourceGenerator
                     }
                 }
 
-                foreach (GeneratorAttributeSyntaxContext syntaxContext in providers.ClassesWithAttribute.Interfaces)
+                foreach (GeneratorAttributeSyntaxContext syntaxContext in providers.ClassesWithAttribute.Handlers)
                 {
                     foreach (AttributeData attributeData in syntaxContext.Attributes)
                     {
                         if (attributeData.ConstructorArguments[0].Value is not string xmlPath) continue;
                         string path = Path.Combine(providers.ProjectPath, xmlPath);
-                        if (new XmlSerializer(typeof(DBusNode)).Deserialize(File.OpenRead(path)) is not DBusNode dBusNode) continue;
+                        if (xmlSerializer.Deserialize(XmlReader.Create(File.OpenRead(path), xmlReaderSettings)) is not DBusNode dBusNode) continue;
                         if (dBusNode.Interfaces is null) continue;
                         ClassDeclarationSyntax classNode = (ClassDeclarationSyntax)syntaxContext.TargetNode;
                         INamedTypeSymbol? declaredClass = syntaxContext.SemanticModel.GetDeclaredSymbol(classNode);
