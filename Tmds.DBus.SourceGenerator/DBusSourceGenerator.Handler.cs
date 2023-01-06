@@ -73,7 +73,7 @@ namespace Tmds.DBus.SourceGenerator
                             TupleExpression()
                                 .AddArguments(
                                     Argument(MakeLiteralExpression(dBusMethod.Name!)),
-                                    Argument(MakeLiteralExpression(ParseSignature(dBusMethod.Arguments) ?? string.Empty)))));
+                                    Argument(MakeLiteralExpression(ParseSignature(inArgs) ?? string.Empty)))));
 
                 BlockSyntax switchSectionBlock = Block();
 
