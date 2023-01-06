@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Linq;
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -72,10 +71,6 @@ namespace Tmds.DBus.SourceGenerator
         private static LiteralExpressionSyntax MakeLiteralExpression(string literal) => LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(literal));
 
         private static LiteralExpressionSyntax MakeLiteralExpression(int literal) => LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(literal));
-
-        private static SyntaxTokenList GetAccessibilityModifiers(SyntaxTokenList modifiers) => TokenList(
-            modifiers.Where(static x =>
-                x.IsKind(SyntaxKind.PublicKeyword) || x.IsKind(SyntaxKind.InternalKeyword) || x.IsKind(SyntaxKind.PrivateKeyword) || x.IsKind(SyntaxKind.ProtectedKeyword)));
 
         private static string TupleOf(IEnumerable<string> elements) => $"({string.Join(", ", elements)})";
     }

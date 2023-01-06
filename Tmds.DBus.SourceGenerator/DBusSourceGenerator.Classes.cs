@@ -101,6 +101,59 @@ namespace Tmds.DBus.SourceGenerator
         {
             MethodDeclarationSyntax watchSignalMethod = MethodDeclaration(ParseTypeName("ValueTask<IDisposable>"), "WatchSignalAsync")
                 .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
+                .AddParameterListParameters(
+                    Parameter(Identifier("connection"))
+                        .WithType(ParseTypeName("Connection")),
+                    Parameter(Identifier("rule"))
+                        .WithType(ParseTypeName("MatchRule")),
+                    Parameter(Identifier("handler"))
+                        .WithType(ParseTypeName("Action<Exception?>")),
+                    Parameter(Identifier("emitOnCapturedContext"))
+                        .WithType(PredefinedType(Token(SyntaxKind.BoolKeyword)))
+                        .WithDefault(EqualsValueClause(LiteralExpression(SyntaxKind.TrueLiteralExpression))))
+                .WithBody(
+                    Block(
+                        ReturnStatement(
+                            InvocationExpression(
+                                    MakeMemberAccessExpression("connection", "AddMatchAsync"))
+                                .AddArgumentListArguments(
+                                    Argument(IdentifierName("rule")),
+                                    Argument(
+                                        ParenthesizedLambdaExpression()
+                                            .AddModifiers(Token(SyntaxKind.StaticKeyword))
+                                            .AddParameterListParameters(
+                                                Parameter(Identifier("_")),
+                                                Parameter(Identifier("_")))
+                                            .WithExpressionBody(
+                                                PostfixUnaryExpression(SyntaxKind.SuppressNullableWarningExpression, LiteralExpression(SyntaxKind.NullLiteralExpression)))),
+                                    Argument(
+                                        ParenthesizedLambdaExpression()
+                                            .AddModifiers(Token(SyntaxKind.StaticKeyword))
+                                            .AddParameterListParameters(
+                                                Parameter(Identifier("e"))
+                                                    .WithType(ParseTypeName("Exception")),
+                                                Parameter(Identifier("_"))
+                                                    .WithType(PredefinedType(Token(SyntaxKind.ObjectKeyword))),
+                                                Parameter(Identifier("_"))
+                                                    .WithType(NullableType(PredefinedType(Token(SyntaxKind.ObjectKeyword)))),
+                                                Parameter(Identifier("handlerState"))
+                                                    .WithType(NullableType(PredefinedType(Token(SyntaxKind.ObjectKeyword)))))
+                                            .WithExpressionBody(
+                                                InvocationExpression(
+                                                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
+                                                            ParenthesizedExpression(
+                                                                CastExpression(ParseTypeName("Action<Exception?>"),
+                                                                    PostfixUnaryExpression(SyntaxKind.SuppressNullableWarningExpression,
+                                                                        IdentifierName("handlerState")))),
+                                                            IdentifierName("Invoke")))
+                                                    .AddArgumentListArguments(
+                                                        Argument(IdentifierName("e"))))),
+                                    Argument(LiteralExpression(SyntaxKind.NullLiteralExpression)),
+                                    Argument(IdentifierName("handler")),
+                                    Argument(IdentifierName("emitOnCapturedContext"))))));
+
+            MethodDeclarationSyntax watchSignalWithReadMethod = MethodDeclaration(ParseTypeName("ValueTask<IDisposable>"), "WatchSignalAsync")
+                .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
                 .AddTypeParameterListParameters(
                     TypeParameter("T"))
                 .AddParameterListParameters(
@@ -202,7 +255,7 @@ namespace Tmds.DBus.SourceGenerator
                     .AddMembers(
                         ClassDeclaration("SignalHelper")
                             .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
-                            .AddMembers(watchSignalMethod, watchPropertiesMethod)));
+                            .AddMembers(watchSignalMethod, watchSignalWithReadMethod, watchPropertiesMethod)));
         }
     }
 }

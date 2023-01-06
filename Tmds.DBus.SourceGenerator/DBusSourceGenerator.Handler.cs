@@ -11,11 +11,10 @@ namespace Tmds.DBus.SourceGenerator
 {
     public partial class DBusSourceGenerator
     {
-        private static ClassDeclarationSyntax GenerateHandler(ClassDeclarationSyntax declaration, DBusInterface dBusInterface)
+        private static ClassDeclarationSyntax GenerateHandler(DBusInterface dBusInterface)
         {
-            ClassDeclarationSyntax cl = ClassDeclaration(declaration.Identifier)
-                .WithModifiers(GetAccessibilityModifiers(declaration.Modifiers))
-                .AddModifiers(Token(SyntaxKind.AbstractKeyword), Token(SyntaxKind.PartialKeyword))
+            ClassDeclarationSyntax cl = ClassDeclaration(Pascalize(dBusInterface.Name!))
+                .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.AbstractKeyword))
                 .AddBaseListTypes(
                     SimpleBaseType(ParseTypeName("IMethodHandler")));
 
@@ -59,8 +58,7 @@ namespace Tmds.DBus.SourceGenerator
 
         private static void AddMethods(ref ClassDeclarationSyntax cl, ref SwitchStatementSyntax sw, DBusInterface dBusInterface)
         {
-            if (dBusInterface.Methods is null)
-                return;
+            if (dBusInterface.Methods is null) return;
 
             SyntaxList<SwitchSectionSyntax> switchSections = List<SwitchSectionSyntax>();
 
@@ -212,8 +210,7 @@ namespace Tmds.DBus.SourceGenerator
 
         private static void AddProperties(ref ClassDeclarationSyntax cl, ref SwitchStatementSyntax sw, DBusInterface dBusInterface)
         {
-            if (dBusInterface.Properties is null)
-                return;
+            if (dBusInterface.Properties is null) return;
 
             sw = sw.AddSections(
                 SwitchSection()

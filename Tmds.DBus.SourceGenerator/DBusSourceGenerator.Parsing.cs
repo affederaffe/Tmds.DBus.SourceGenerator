@@ -12,6 +12,32 @@ namespace Tmds.DBus.SourceGenerator
 {
     public partial class DBusSourceGenerator
     {
+        private static string Pascalize(string name, bool camel = false)
+        {
+            bool upperizeNext = !camel;
+            StringBuilder sb = new(name.Length);
+            foreach (char och in name)
+            {
+                char ch = och;
+                if (ch is '_' or '.')
+                {
+                    upperizeNext = true;
+                }
+                else
+                {
+                    if (upperizeNext)
+                    {
+                        ch = char.ToUpperInvariant(ch);
+                        upperizeNext = false;
+                    }
+
+                    sb.Append(ch);
+                }
+            }
+
+            return sb.ToString();
+        }
+
         private static string? ParseSignature(IReadOnlyList<DBusValue>? dBusValues)
         {
             if (dBusValues is null || dBusValues.Count == 0) return null;
@@ -89,6 +115,7 @@ namespace Tmds.DBus.SourceGenerator
                 DBusType.UnixFd => ("SafeHandle", innerTypes, dBusType),
                 DBusType.Array => ($"{innerTypes[0]}[]", innerTypes, dBusType),
                 DBusType.DictEntry => ($"Dictionary<{innerTypes[0]}, {innerTypes[1]}>", innerTypes, dBusType),
+                DBusType.Struct when innerTypes.Length == 1 => ($"ValueTuple<{innerTypes[0]}>", innerTypes, dBusType),
                 DBusType.Struct => ($"{TupleOf(innerTypes)}", innerTypes, dBusType),
                 _ => throw new ArgumentOutOfRangeException(nameof(dBusType), dBusType, null)
             };

@@ -12,7 +12,7 @@ namespace Tmds.DBus.SourceGenerator
     public class DBusNode
     {
         [XmlElement("interface")]
-        public DBusInterface? Interface { get; set; }
+        public DBusInterface[]? Interfaces { get; set; }
     }
 
     [Serializable]

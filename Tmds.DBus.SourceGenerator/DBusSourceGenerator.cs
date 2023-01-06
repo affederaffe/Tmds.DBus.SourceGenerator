@@ -56,32 +56,38 @@ namespace Tmds.DBus.SourceGenerator
                 {
                     if (syntaxContext.Attributes[0].ConstructorArguments[0].Value is not string xmlPath) continue;
                     string path = Path.Combine(providers.ProjectPath, xmlPath);
-                    if (new XmlSerializer(typeof(DBusNode)).Deserialize(new StringReader(File.ReadAllText(path))) is not DBusNode dBusNode) continue;
-                    if (dBusNode.Interface is null) continue;
+                    if (new XmlSerializer(typeof(DBusNode)).Deserialize(File.OpenRead(path)) is not DBusNode dBusNode) continue;
+                    if (dBusNode.Interfaces is null) continue;
                     ClassDeclarationSyntax classNode = (ClassDeclarationSyntax)syntaxContext.TargetNode;
                     INamedTypeSymbol? declaredClass = syntaxContext.SemanticModel.GetDeclaredSymbol(classNode);
                     if (declaredClass is null) continue;
                     string @namespace = declaredClass.ContainingNamespace.ToDisplayString();
-                    TypeDeclarationSyntax typeDeclarationSyntax = GenerateProxy(classNode, dBusNode.Interface);
-                    NamespaceDeclarationSyntax namespaceDeclaration = NamespaceDeclaration(IdentifierName(@namespace)).AddMembers(typeDeclarationSyntax);
-                    CompilationUnitSyntax compilationUnit = MakeCompilationUnit(namespaceDeclaration);
-                    productionContext.AddSource($"{@namespace}.{declaredClass.Name}.g.cs", compilationUnit.GetText(Encoding.UTF8));
+                    foreach (DBusInterface dBusInterface in dBusNode.Interfaces)
+                    {
+                        TypeDeclarationSyntax typeDeclarationSyntax = GenerateProxy(dBusInterface);
+                        NamespaceDeclarationSyntax namespaceDeclaration = NamespaceDeclaration(IdentifierName(@namespace)).AddMembers(typeDeclarationSyntax);
+                        CompilationUnitSyntax compilationUnit = MakeCompilationUnit(namespaceDeclaration);
+                        productionContext.AddSource($"{@namespace}.{Pascalize(dBusInterface.Name!)}.g.cs", compilationUnit.GetText(Encoding.UTF8));
+                    }
                 }
 
                 foreach (GeneratorAttributeSyntaxContext syntaxContext in providers.ClassesWithAttribute.Handlers)
                 {
                     if (syntaxContext.Attributes[0].ConstructorArguments[0].Value is not string xmlPath) continue;
                     string path = Path.Combine(providers.ProjectPath, xmlPath);
-                    if (new XmlSerializer(typeof(DBusNode)).Deserialize(new StringReader(File.ReadAllText(path))) is not DBusNode dBusNode) continue;
-                    if (dBusNode.Interface is null) continue;
+                    if (new XmlSerializer(typeof(DBusNode)).Deserialize(File.OpenRead(path)) is not DBusNode dBusNode) continue;
+                    if (dBusNode.Interfaces is null) continue;
                     ClassDeclarationSyntax classNode = (ClassDeclarationSyntax)syntaxContext.TargetNode;
                     INamedTypeSymbol? declaredClass = syntaxContext.SemanticModel.GetDeclaredSymbol(classNode);
                     if (declaredClass is null) continue;
                     string @namespace = declaredClass.ContainingNamespace.ToDisplayString();
-                    TypeDeclarationSyntax typeDeclarationSyntax = GenerateHandler(classNode, dBusNode.Interface);
-                    NamespaceDeclarationSyntax namespaceDeclaration = NamespaceDeclaration(IdentifierName(@namespace)).AddMembers(typeDeclarationSyntax);
-                    CompilationUnitSyntax compilationUnit = MakeCompilationUnit(namespaceDeclaration);
-                    productionContext.AddSource($"{@namespace}.{declaredClass.Name}.g.cs", compilationUnit.GetText(Encoding.UTF8));
+                    foreach (DBusInterface dBusInterface in dBusNode.Interfaces)
+                    {
+                        TypeDeclarationSyntax typeDeclarationSyntax = GenerateHandler(dBusInterface);
+                        NamespaceDeclarationSyntax namespaceDeclaration = NamespaceDeclaration(IdentifierName(@namespace)).AddMembers(typeDeclarationSyntax);
+                        CompilationUnitSyntax compilationUnit = MakeCompilationUnit(namespaceDeclaration);
+                        productionContext.AddSource($"{@namespace}.{Pascalize(dBusInterface.Name!)}.g.cs", compilationUnit.GetText(Encoding.UTF8));
+                    }
                 }
 
                 productionContext.AddSource("Tmds.DBus.SourceGenerator.ReaderExtensions.cs", MakeCompilationUnit(NamespaceDeclaration(IdentifierName("Tmds.DBus.SourceGenerator")).AddMembers(_readerExtensions)).GetText(Encoding.UTF8));
