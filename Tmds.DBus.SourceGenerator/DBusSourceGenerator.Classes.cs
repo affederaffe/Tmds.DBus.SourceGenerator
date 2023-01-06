@@ -46,7 +46,11 @@ namespace Tmds.DBus.SourceGenerator
                                     Attribute(IdentifierName("AttributeUsage"))
                                         .AddArgumentListArguments(
                                             AttributeArgument(
-                                                MakeMemberAccessExpression("AttributeTargets", "Class")))))
+                                                MakeMemberAccessExpression("AttributeTargets", "Class")),
+                                            AttributeArgument(
+                                                    LiteralExpression(SyntaxKind.TrueLiteralExpression))
+                                                .WithNameEquals(
+                                                    NameEquals("AllowMultiple")))))
                         .AddMembers(
                             ConstructorDeclaration("DBusHandlerAttribute")
                                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
