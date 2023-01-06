@@ -51,7 +51,7 @@ namespace Tmds.DBus.SourceGenerator
         {
             0 or null => null,
             1 => dBusValues[0].DotNetType,
-            _ => TupleOf(dBusValues.Select(static (x, i) => $"{x.DotNetType} {x.Name ?? $"Item{i}"}"))
+            _ => TupleOf(dBusValues.Select(static (x, i) => $"{x.DotNetType} {x.Name ?? $"Item{i + 1}"}"))
         };
 
         private static string ParseTaskReturnType(DBusValue dBusValue) => ParseTaskReturnType(new[] { dBusValue });
@@ -60,7 +60,7 @@ namespace Tmds.DBus.SourceGenerator
         {
             0 or null => "Task",
             1 => $"Task<{dBusValues[0].DotNetType}>",
-            _ => $"Task<{TupleOf(dBusValues.Select(static (x, i) => $"{x.DotNetType} {x.Name ?? $"Item{i}"}"))}>"
+            _ => $"Task<{TupleOf(dBusValues.Select(static (x, i) => $"{x.DotNetType} {x.Name ?? $"Item{i + 1}"}"))}>"
         };
 
         private static ParameterListSyntax ParseParameterList(IEnumerable<DBusValue> inArgs) => ParameterList(

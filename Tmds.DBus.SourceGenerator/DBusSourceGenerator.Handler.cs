@@ -175,7 +175,7 @@ namespace Tmds.DBus.SourceGenerator
                                             MakeMemberAccessExpression("writer", $"Write{ParseReadWriteMethod(outArgs[i])}"))
                                         .AddArgumentListArguments(
                                             Argument(
-                                                MakeMemberAccessExpression("ret", outArgs[i].Name ?? $"Item{i}")))));
+                                                MakeMemberAccessExpression("ret", outArgs[i].Name ?? $"Item{i + 1}")))));
                         }
                     }
 
