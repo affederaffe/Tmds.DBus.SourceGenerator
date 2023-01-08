@@ -36,105 +36,107 @@ namespace Tmds.DBus.SourceGenerator
                         MakeAssignmentExpressionStatement("_path", "path")));
 
             cl = cl.AddMembers(interfaceConst, connectionField, destinationField, pathField, ctor);
-            cl = AddMethods(cl, dBusInterface.Methods);
-            cl = AddSignals(cl, dBusInterface.Signals);
-            cl = AddProperties(cl, dBusInterface);
+            AddProxyMethods(ref cl, dBusInterface);
+            AddProxySignals(ref cl, dBusInterface);
+            AddProperties(ref cl, dBusInterface);
 
             return cl;
         }
 
-        private ClassDeclarationSyntax AddMethods(ClassDeclarationSyntax cl, IEnumerable<DBusMethod>? dBusMethods) =>
-            dBusMethods is null ? cl : dBusMethods.Aggregate(cl, (current, dBusMethod) => current.AddMembers(MakeMethod(dBusMethod)));
-
-        private MethodDeclarationSyntax MakeMethod(DBusMethod dBusMethod)
+        private void AddProxyMethods(ref ClassDeclarationSyntax cl, DBusInterface dBusInterface)
         {
-            DBusArgument[]? inArgs = dBusMethod.Arguments?.Where(static m => m.Direction is null or "in").ToArray();
-            DBusArgument[]? outArgs = dBusMethod.Arguments?.Where(static m => m.Direction == "out").ToArray();
+            if (dBusInterface.Methods is null) return;
+            foreach (DBusMethod dBusMethod in dBusInterface.Methods)
+            {
+                DBusArgument[]? inArgs = dBusMethod.Arguments?.Where(static m => m.Direction is null or "in").ToArray();
+                DBusArgument[]? outArgs = dBusMethod.Arguments?.Where(static m => m.Direction == "out").ToArray();
 
-            string returnType = ParseTaskReturnType(outArgs);
+                string returnType = ParseTaskReturnType(outArgs);
 
-            ArgumentListSyntax args = ArgumentList(
-                SingletonSeparatedList(
-                    Argument(
+                ArgumentListSyntax args = ArgumentList(
+                    SingletonSeparatedList(
+                        Argument(
+                            InvocationExpression(
+                                IdentifierName("CreateMessage")))));
+
+                if (outArgs?.Length > 0)
+                    args = args.AddArguments(
+                        Argument(
+                            MakeMemberAccessExpression("ReaderExtensions", GetOrAddReadMessageMethod(outArgs))));
+
+                ExpressionStatementSyntax[] statements = inArgs?.Select(static (x, i) => ExpressionStatement(
                         InvocationExpression(
-                            IdentifierName("CreateMessage")))));
+                                MakeMemberAccessExpression("writer", $"Write{ParseReadWriteMethod(x)}"))
+                            .AddArgumentListArguments(
+                                Argument(IdentifierName(x.Name ?? $"arg{i}")))))
+                    .ToArray() ?? Array.Empty<ExpressionStatementSyntax>();
 
-            if (outArgs?.Length > 0)
-                args = args.AddArguments(
-                    Argument(
-                        MakeMemberAccessExpression("ReaderExtensions", GetOrAddReadMessageMethod(outArgs))));
+                BlockSyntax createMessageBody = MakeCreateMessageBody(IdentifierName("Interface"), dBusMethod.Name!, ParseSignature(inArgs), statements);
 
-            ExpressionStatementSyntax[] statements = inArgs?.Select(static (x, i) => ExpressionStatement(
-                InvocationExpression(
-                        MakeMemberAccessExpression("writer", $"Write{ParseReadWriteMethod(x)}"))
-                    .AddArgumentListArguments(
-                        Argument(IdentifierName(x.Name ?? $"arg{i}")))))
-                .ToArray() ?? Array.Empty<ExpressionStatementSyntax>();
+                MethodDeclarationSyntax proxyMethod = MethodDeclaration(ParseTypeName(returnType), $"{dBusMethod.Name}Async")
+                    .AddModifiers(Token(SyntaxKind.PublicKeyword));
 
-            BlockSyntax createMessageBody = MakeCreateMessageBody(IdentifierName("Interface"), dBusMethod.Name!, ParseSignature(inArgs), statements);
+                if (inArgs is not null)
+                    proxyMethod = proxyMethod
+                        .WithParameterList(ParseParameterList(inArgs));
 
-            MethodDeclarationSyntax proxyMethod = MethodDeclaration(ParseTypeName(returnType), $"{dBusMethod.Name}Async")
-                .AddModifiers(Token(SyntaxKind.PublicKeyword));
-
-            if (inArgs is not null)
-                proxyMethod = proxyMethod
-                    .WithParameterList(ParseParameterList(inArgs));
-
-            return proxyMethod.WithBody(MakeCallMethodReturnBody(args, createMessageBody));
+                cl = cl.AddMembers(proxyMethod.WithBody(MakeCallMethodReturnBody(args, createMessageBody)));
+            }
         }
 
-        private ClassDeclarationSyntax AddSignals(ClassDeclarationSyntax cl, IEnumerable<DBusSignal>? dBusSignals) =>
-            dBusSignals is null ? cl : dBusSignals.Aggregate(cl, (current, dBusSignal) => current.AddMembers(MakeSignal(dBusSignal)));
-
-        private MethodDeclarationSyntax MakeSignal(DBusSignal dBusSignal)
+        private void AddProxySignals(ref ClassDeclarationSyntax cl, DBusInterface dBusInterface)
         {
-            DBusArgument[]? outArgs = dBusSignal.Arguments?.Where(static x => x.Direction is null or "out").ToArray();
-            string? returnType = ParseReturnType(outArgs);
+            if (dBusInterface.Signals is null) return;
+            foreach (DBusSignal dBusSignal in dBusInterface.Signals)
+            {
+                DBusArgument[]? outArgs = dBusSignal.Arguments?.Where(static x => x.Direction is null or "out").ToArray();
+                string? returnType = ParseReturnType(outArgs);
 
-            ParameterListSyntax parameters = ParameterList();
+                ParameterListSyntax parameters = ParameterList();
 
-            parameters = returnType is not null
-                ? parameters.AddParameters(
-                    Parameter(Identifier("handler"))
-                        .WithType(ParseTypeName($"Action<Exception?, {returnType}>")))
-                : parameters.AddParameters(
-                    Parameter(Identifier("handler"))
-                        .WithType(ParseTypeName("Action<Exception?>")));
+                parameters = returnType is not null
+                    ? parameters.AddParameters(
+                        Parameter(Identifier("handler"))
+                            .WithType(ParseTypeName($"Action<Exception?, {returnType}>")))
+                    : parameters.AddParameters(
+                        Parameter(Identifier("handler"))
+                            .WithType(ParseTypeName("Action<Exception?>")));
 
-            parameters = parameters.AddParameters(
-                Parameter(Identifier("emitOnCapturedContext"))
-                    .WithType(PredefinedType(Token(SyntaxKind.BoolKeyword)))
-                    .WithDefault(EqualsValueClause(LiteralExpression(SyntaxKind.TrueLiteralExpression))));
+                parameters = parameters.AddParameters(
+                    Parameter(Identifier("emitOnCapturedContext"))
+                        .WithType(PredefinedType(Token(SyntaxKind.BoolKeyword)))
+                        .WithDefault(EqualsValueClause(LiteralExpression(SyntaxKind.TrueLiteralExpression))));
 
-            ArgumentListSyntax arguments = ArgumentList()
-                .AddArguments(Argument(IdentifierName("_connection")),
-                    Argument(IdentifierName("rule")));
+                ArgumentListSyntax arguments = ArgumentList()
+                    .AddArguments(Argument(IdentifierName("_connection")),
+                        Argument(IdentifierName("rule")));
 
-            if (outArgs is not null)
+                if (outArgs is not null)
+                    arguments = arguments.AddArguments(
+                        Argument(MakeMemberAccessExpression("ReaderExtensions", GetOrAddReadMessageMethod(outArgs))));
+
                 arguments = arguments.AddArguments(
-                    Argument(MakeMemberAccessExpression("ReaderExtensions", GetOrAddReadMessageMethod(outArgs))));
+                    Argument(IdentifierName("handler")),
+                    Argument(IdentifierName("emitOnCapturedContext")));
 
-            arguments = arguments.AddArguments(
-                Argument(IdentifierName("handler")),
-                Argument(IdentifierName("emitOnCapturedContext")));
+                MethodDeclarationSyntax watchSignalMethod = MethodDeclaration(ParseTypeName("ValueTask<IDisposable>"), $"Watch{dBusSignal.Name}Async")
+                    .AddModifiers(Token(SyntaxKind.PublicKeyword))
+                    .WithParameterList(parameters)
+                    .WithBody(
+                        Block(
+                            LocalDeclarationStatement(
+                                VariableDeclaration(ParseTypeName("MatchRule"))
+                                    .AddVariables(
+                                        VariableDeclarator("rule")
+                                            .WithInitializer(
+                                                EqualsValueClause(MakeMatchRule(dBusSignal))))),
+                            ReturnStatement(
+                                InvocationExpression(
+                                        MakeMemberAccessExpression("SignalHelper", "WatchSignalAsync"))
+                                    .WithArgumentList(arguments))));
 
-            MethodDeclarationSyntax watchSignalMethod = MethodDeclaration(ParseTypeName("ValueTask<IDisposable>"), $"Watch{dBusSignal.Name}Async")
-                .AddModifiers(Token(SyntaxKind.PublicKeyword))
-                .WithParameterList(parameters)
-                .WithBody(
-                    Block(
-                        LocalDeclarationStatement(
-                            VariableDeclaration(ParseTypeName("MatchRule"))
-                                .AddVariables(
-                                    VariableDeclarator("rule")
-                                        .WithInitializer(
-                                            EqualsValueClause(MakeMatchRule(dBusSignal))))),
-                        ReturnStatement(
-                            InvocationExpression(
-                                MakeMemberAccessExpression("SignalHelper", "WatchSignalAsync"))
-                                .WithArgumentList(arguments))));
-
-            return watchSignalMethod;
+                cl = cl.AddMembers(watchSignalMethod);
+            }
         }
 
         private static ObjectCreationExpressionSyntax MakeMatchRule(DBusSignal dBusSignal) =>
@@ -148,8 +150,8 @@ namespace Tmds.DBus.SourceGenerator
                             MakeAssignmentExpression(IdentifierName("Member"), MakeLiteralExpression(dBusSignal.Name!)),
                             MakeAssignmentExpression(IdentifierName("Interface"), IdentifierName("Interface"))));
 
-        private static ClassDeclarationSyntax AddWatchPropertiesChanged(ClassDeclarationSyntax cl) =>
-            cl.AddMembers(MethodDeclaration(ParseTypeName("ValueTask<IDisposable>"), "WatchPropertiesChangedAsync")
+        private static void AddWatchPropertiesChanged(ref ClassDeclarationSyntax cl) =>
+            cl = cl.AddMembers(MethodDeclaration(ParseTypeName("ValueTask<IDisposable>"), "WatchPropertiesChangedAsync")
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(
                     Parameter(Identifier("handler"))
@@ -218,10 +220,9 @@ namespace Tmds.DBus.SourceGenerator
                                                     InvocationExpression(
                                                         MakeMemberAccessExpression("reader", "ReadArray<string>"))))))))));
 
-        private ClassDeclarationSyntax AddProperties(ClassDeclarationSyntax cl, DBusInterface dBusInterface)
+        private void AddProperties(ref ClassDeclarationSyntax cl, DBusInterface dBusInterface)
         {
-            if (dBusInterface.Properties is null || dBusInterface.Properties.Length == 0)
-                return cl;
+            if (dBusInterface.Properties is null || dBusInterface.Properties.Length == 0) return;
 
             cl = dBusInterface.Properties!.Aggregate(cl, (current, dBusProperty) => dBusProperty.Access switch
             {
@@ -231,12 +232,10 @@ namespace Tmds.DBus.SourceGenerator
                 _ => current
             });
 
-            cl = AddGetAllMethod(cl);
-            cl = AddReadProperties(cl, dBusInterface.Properties);
-            cl = AddPropertiesClass(cl, dBusInterface);
-            cl = AddWatchPropertiesChanged(cl);
-
-            return cl;
+            AddGetAllMethod(ref cl);
+            AddReadProperties(ref cl, dBusInterface.Properties);
+            AddPropertiesClass(ref cl, dBusInterface);
+            AddWatchPropertiesChanged(ref cl);
         }
 
         private MethodDeclarationSyntax MakeGetMethod(DBusProperty dBusProperty)
@@ -295,7 +294,7 @@ namespace Tmds.DBus.SourceGenerator
                     MakeCallMethodReturnBody(args, createMessageBody));
         }
 
-        private static ClassDeclarationSyntax AddGetAllMethod(ClassDeclarationSyntax cl)
+        private static void AddGetAllMethod(ref ClassDeclarationSyntax cl)
         {
             BlockSyntax createGetAllMessageBody = MakeCreateMessageBody(MakeLiteralExpression("org.freedesktop.DBus.Properties"), "GetAll", "s",
                 ExpressionStatement(
@@ -323,7 +322,7 @@ namespace Tmds.DBus.SourceGenerator
                                     Argument(IdentifierName("reader"))
                                         .WithRefKindKeyword(Token(SyntaxKind.RefKeyword))))));
 
-            return cl.AddMembers(
+            cl = cl.AddMembers(
                 MethodDeclaration(ParseTypeName("Task<Properties>"), "GetAllAsync")
                     .AddModifiers(Token(SyntaxKind.PublicKeyword))
                     .WithBody(
@@ -338,7 +337,7 @@ namespace Tmds.DBus.SourceGenerator
                                 .WithBody(createGetAllMessageBody))));
         }
 
-        private static ClassDeclarationSyntax AddPropertiesClass(ClassDeclarationSyntax cl, DBusInterface dBusInterface)
+        private static void AddPropertiesClass(ref ClassDeclarationSyntax cl, DBusInterface dBusInterface)
         {
             ClassDeclarationSyntax propertiesClass = ClassDeclaration("Properties")
                 .AddModifiers(Token(SyntaxKind.PublicKeyword));
@@ -347,11 +346,11 @@ namespace Tmds.DBus.SourceGenerator
                 => current.AddMembers(
                     MakeGetSetProperty(ParseTypeName(property.DotNetType), property.Name!, Token(SyntaxKind.PublicKeyword))));
 
-            return cl.AddMembers(propertiesClass);
+            cl = cl.AddMembers(propertiesClass);
         }
 
-        private static ClassDeclarationSyntax AddReadProperties(ClassDeclarationSyntax cl, IEnumerable<DBusProperty> dBusProperties) =>
-            cl.AddMembers(
+        private static void AddReadProperties(ref ClassDeclarationSyntax cl, IEnumerable<DBusProperty> dBusProperties) =>
+            cl = cl.AddMembers(
                 MethodDeclaration(ParseTypeName("Properties"), "ReadProperties")
                     .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword))
                     .AddParameterListParameters(

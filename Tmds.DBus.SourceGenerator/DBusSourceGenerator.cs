@@ -20,7 +20,7 @@ namespace Tmds.DBus.SourceGenerator
         private Dictionary<string, string> _readMethodForSignature = null!;
         private ClassDeclarationSyntax _readerExtensions = null!;
 
-        private static DiagnosticDescriptor XmlFileNotFound = new("DBusSG", "Xml File not found", "Could not find file '{0}'", "DBus", DiagnosticSeverity.Error, true);
+        private static readonly DiagnosticDescriptor _xmlFileNotFound = new("DBusSG", "Xml File not found", "Could not find file '{0}'", "DBus", DiagnosticSeverity.Error, true);
 
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
@@ -72,7 +72,7 @@ namespace Tmds.DBus.SourceGenerator
                         string path = Path.Combine(providers.ProjectPath, xmlPath);
                         if (!File.Exists(path))
                         {
-                            productionContext.ReportDiagnostic(Diagnostic.Create(XmlFileNotFound, syntaxContext.TargetNode.GetLocation(), path));
+                            productionContext.ReportDiagnostic(Diagnostic.Create(_xmlFileNotFound, syntaxContext.TargetNode.GetLocation(), path));
                             return;
                         }
 
@@ -100,7 +100,7 @@ namespace Tmds.DBus.SourceGenerator
                         string path = Path.Combine(providers.ProjectPath, xmlPath);
                         if (!File.Exists(path))
                         {
-                            productionContext.ReportDiagnostic(Diagnostic.Create(XmlFileNotFound, syntaxContext.TargetNode.GetLocation(), path));
+                            productionContext.ReportDiagnostic(Diagnostic.Create(_xmlFileNotFound, syntaxContext.TargetNode.GetLocation(), path));
                             return;
                         }
 

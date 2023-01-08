@@ -16,7 +16,10 @@ namespace Tmds.DBus.SourceGenerator
             ClassDeclarationSyntax cl = ClassDeclaration(Pascalize(dBusInterface.Name!))
                 .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.AbstractKeyword))
                 .AddBaseListTypes(
-                    SimpleBaseType(ParseTypeName("IMethodHandler")));
+                    SimpleBaseType(ParseTypeName("IMethodHandler")))
+                .AddMembers(
+                    MakeGetOnlyProperty(ParseTypeName("Connection"), "Connection", Token(SyntaxKind.ProtectedKeyword), Token(SyntaxKind.AbstractKeyword)),
+                    MakeGetOnlyProperty(PredefinedType(Token(SyntaxKind.StringKeyword)), "Path", Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.AbstractKeyword)));
 
             MethodDeclarationSyntax handleMethod = MethodDeclaration(ParseTypeName("ValueTask"), "HandleMethodAsync")
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
@@ -26,11 +29,9 @@ namespace Tmds.DBus.SourceGenerator
 
             SwitchStatementSyntax switchStatement = SwitchStatement(MakeMemberAccessExpression("context", "Request", "InterfaceAsString"));
 
-            AddMethods(ref cl, ref switchStatement, dBusInterface);
-            AddProperties(ref cl, ref switchStatement, dBusInterface);
-
-            cl = cl.AddMembers(
-                MakeGetOnlyProperty(PredefinedType(Token(SyntaxKind.StringKeyword)), "Path", Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.AbstractKeyword)));
+            AddHandlerMethods(ref cl, ref switchStatement, dBusInterface);
+            AddHandlerSignals(ref cl, dBusInterface);
+            AddHandlerProperties(ref cl, ref switchStatement, dBusInterface);
 
             if (dBusInterface.Properties?.Length > 0)
                 cl = cl.AddMembers(
@@ -56,7 +57,7 @@ namespace Tmds.DBus.SourceGenerator
             return cl;
         }
 
-        private static void AddMethods(ref ClassDeclarationSyntax cl, ref SwitchStatementSyntax sw, DBusInterface dBusInterface)
+        private static void AddHandlerMethods(ref ClassDeclarationSyntax cl, ref SwitchStatementSyntax sw, DBusInterface dBusInterface)
         {
             if (dBusInterface.Methods is null) return;
 
@@ -73,7 +74,7 @@ namespace Tmds.DBus.SourceGenerator
                             TupleExpression()
                                 .AddArguments(
                                     Argument(MakeLiteralExpression(dBusMethod.Name!)),
-                                    Argument(MakeLiteralExpression(ParseSignature(inArgs) ?? string.Empty)))));
+                                    Argument(inArgs?.Length > 0 ? MakeLiteralExpression(ParseSignature(inArgs)!) : LiteralExpression(SyntaxKind.NullLiteralExpression)))));
 
                 BlockSyntax switchSectionBlock = Block();
 
@@ -208,10 +209,9 @@ namespace Tmds.DBus.SourceGenerator
                         BreakStatement()));
         }
 
-        private static void AddProperties(ref ClassDeclarationSyntax cl, ref SwitchStatementSyntax sw, DBusInterface dBusInterface)
+        private static void AddHandlerProperties(ref ClassDeclarationSyntax cl, ref SwitchStatementSyntax sw, DBusInterface dBusInterface)
         {
             if (dBusInterface.Properties is null) return;
-
             sw = sw.AddSections(
                 SwitchSection()
                     .AddLabels(
@@ -332,7 +332,77 @@ namespace Tmds.DBus.SourceGenerator
                                             BreakStatement()))),
                         BreakStatement()));
 
-            cl = AddPropertiesClass(cl, dBusInterface);
+            AddPropertiesClass(ref cl, dBusInterface);
+        }
+
+        private static void AddHandlerSignals(ref ClassDeclarationSyntax cl, DBusInterface dBusInterface)
+        {
+            if (dBusInterface.Signals is null) return;
+            foreach (DBusSignal dBusSignal in dBusInterface.Signals)
+            {
+                MethodDeclarationSyntax method = MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), $"Emit{Pascalize(dBusSignal.Name!)}")
+                    .AddModifiers(Token(SyntaxKind.ProtectedKeyword));
+
+                if (dBusSignal.Arguments?.Length > 0)
+                    method = method.WithParameterList(
+                        ParameterList(
+                            SeparatedList(
+                                dBusSignal.Arguments.Select(
+                                    static (x, i) => Parameter(Identifier(x.Name ?? $"arg{i}")).WithType(ParseTypeName(x.DotNetType))))));
+
+                BlockSyntax body = Block();
+
+                body = body.AddStatements(
+                    LocalDeclarationStatement(VariableDeclaration(ParseTypeName("MessageWriter"),
+                            SingletonSeparatedList(
+                                VariableDeclarator("writer")
+                                    .WithInitializer(EqualsValueClause(
+                                        InvocationExpression(
+                                            MakeMemberAccessExpression("Connection", "GetMessageWriter")))))))
+                        .WithUsingKeyword(Token(SyntaxKind.UsingKeyword)));
+
+                ArgumentListSyntax args = ArgumentList()
+                    .AddArguments(
+                        Argument(LiteralExpression(SyntaxKind.NullLiteralExpression)),
+                        Argument(IdentifierName("Path")),
+                        Argument(MakeLiteralExpression(dBusInterface.Name!)),
+                        Argument(MakeLiteralExpression(dBusSignal.Name!)));
+
+                if (dBusSignal.Arguments?.Length > 0)
+                    args = args.AddArguments(
+                        Argument(MakeLiteralExpression(ParseSignature(dBusSignal.Arguments)!)));
+
+                body = body.AddStatements(
+                    ExpressionStatement(
+                        InvocationExpression(
+                                MakeMemberAccessExpression("writer", "WriteSignalHeader"))
+                            .WithArgumentList(args)));
+
+                if (dBusSignal.Arguments?.Length > 0)
+                {
+                    for (int i = 0; i < dBusSignal.Arguments.Length; i++)
+                    {
+                        body = body.AddStatements(
+                            ExpressionStatement(
+                                InvocationExpression(
+                                        MakeMemberAccessExpression("writer", $"Write{ParseReadWriteMethod(dBusSignal.Arguments[i])}"))
+                                    .AddArgumentListArguments(
+                                        Argument(
+                                            IdentifierName(dBusSignal.Arguments[i].Name ?? $"arg{i}")))));
+                    }
+                }
+
+                body = body.AddStatements(
+                    ExpressionStatement(
+                        InvocationExpression(
+                                MakeMemberAccessExpression("Connection", "TrySendMessage"))
+                            .AddArgumentListArguments(
+                                Argument(
+                                    InvocationExpression(
+                                        MakeMemberAccessExpression("writer", "CreateMessage"))))));
+
+                cl = cl.AddMembers(method.WithBody(body));
+            }
         }
     }
 }
