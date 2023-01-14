@@ -64,9 +64,9 @@ namespace Tmds.DBus.SourceGenerator
                         Argument(
                             MakeMemberAccessExpression("ReaderExtensions", GetOrAddReadMessageMethod(outArgs))));
 
-                ExpressionStatementSyntax[] statements = inArgs?.Select(static (x, i) => ExpressionStatement(
+                ExpressionStatementSyntax[] statements = inArgs?.Select((x, i) => ExpressionStatement(
                         InvocationExpression(
-                                MakeMemberAccessExpression("writer", $"Write{ParseReadWriteMethod(x)}"))
+                                MakeMemberAccessExpression("writer", GetOrAddWriteMethod(x)))
                             .AddArgumentListArguments(
                                 Argument(IdentifierName(x.Name ?? $"arg{i}")))))
                     .ToArray() ?? Array.Empty<ExpressionStatementSyntax>();
@@ -150,7 +150,7 @@ namespace Tmds.DBus.SourceGenerator
                             MakeAssignmentExpression(IdentifierName("Member"), MakeLiteralExpression(dBusSignal.Name!)),
                             MakeAssignmentExpression(IdentifierName("Interface"), IdentifierName("Interface"))));
 
-        private static void AddWatchPropertiesChanged(ref ClassDeclarationSyntax cl) =>
+        private void AddWatchPropertiesChanged(ref ClassDeclarationSyntax cl) =>
             cl = cl.AddMembers(MethodDeclaration(ParseTypeName("ValueTask<IDisposable>"), "WatchPropertiesChangedAsync")
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(
@@ -218,7 +218,7 @@ namespace Tmds.DBus.SourceGenerator
                                                         MakeMemberAccessExpression("changed", "ToArray"))),
                                                 Argument(
                                                     InvocationExpression(
-                                                        MakeMemberAccessExpression("reader", "ReadArray<string>"))))))))));
+                                                        MakeMemberAccessExpression("reader", GetOrAddReadMethod(new DBusValue { Type = "as" })))))))))));
 
         private void AddProperties(ref ClassDeclarationSyntax cl, DBusInterface dBusInterface)
         {
@@ -349,7 +349,7 @@ namespace Tmds.DBus.SourceGenerator
             cl = cl.AddMembers(propertiesClass);
         }
 
-        private static void AddReadProperties(ref ClassDeclarationSyntax cl, IEnumerable<DBusProperty> dBusProperties) =>
+        private void AddReadProperties(ref ClassDeclarationSyntax cl, IEnumerable<DBusProperty> dBusProperties) =>
             cl = cl.AddMembers(
                 MethodDeclaration(ParseTypeName("Properties"), "ReadProperties")
                     .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword))
@@ -390,7 +390,7 @@ namespace Tmds.DBus.SourceGenerator
                                                 MakeMemberAccessExpression("reader", "ReadString")))
                                         .WithSections(
                                             List(
-                                                dBusProperties.Select(static x => SwitchSection()
+                                                dBusProperties.Select(x => SwitchSection()
                                                     .AddLabels(
                                                         CaseSwitchLabel(
                                                             MakeLiteralExpression(x.Name!)))
@@ -404,7 +404,7 @@ namespace Tmds.DBus.SourceGenerator
                                                             AssignmentExpression(SyntaxKind.SimpleAssignmentExpression,
                                                                 MakeMemberAccessExpression("props", x.Name!),
                                                                 InvocationExpression(
-                                                                    MakeMemberAccessExpression("reader", $"Read{ParseReadWriteMethod(x)}")))),
+                                                                    MakeMemberAccessExpression("reader", GetOrAddReadMethod(x))))),
                                                         ExpressionStatement(
                                                             ConditionalAccessExpression(
                                                                 IdentifierName("changed"), InvocationExpression(
@@ -452,70 +452,6 @@ namespace Tmds.DBus.SourceGenerator
                 .AddStatements(ReturnStatement(
                     InvocationExpression(
                         MakeMemberAccessExpression("writer", "CreateMessage"))));
-        }
-
-        private string GetOrAddReadMessageMethod(DBusValue dBusValue) => GetOrAddReadMessageMethod(new[] { dBusValue });
-
-        private string GetOrAddReadMessageMethod(IReadOnlyList<DBusValue> dBusValues)
-        {
-            string signature = ParseSignature(dBusValues)!.Replace('{', 'e').Replace("}", null).Replace('(', 'r').Replace(')', 'z');
-            if (_readMethodForSignature.TryGetValue(signature, out string identifier))
-                return identifier;
-
-            identifier = $"ReadMessage_{signature}";
-            string returnType = ParseReturnType(dBusValues)!;
-
-            BlockSyntax block = Block()
-                .AddStatements(
-                    LocalDeclarationStatement(
-                        VariableDeclaration(ParseTypeName("Reader"))
-                            .AddVariables(
-                                VariableDeclarator("reader")
-                                    .WithInitializer(
-                                        EqualsValueClause(
-                                            InvocationExpression(
-                                                MakeMemberAccessExpression("message", "GetBodyReader")))))));
-
-            if (dBusValues.Count == 1)
-            {
-                block = block.AddStatements(
-                    ReturnStatement(
-                        InvocationExpression(
-                            MakeMemberAccessExpression("reader", $"Read{ParseReadWriteMethod(dBusValues[0])}"))));
-            }
-            else
-            {
-                for (int i = 0; i < dBusValues.Count; i++)
-                {
-                    block = block.AddStatements(
-                        LocalDeclarationStatement(
-                            VariableDeclaration(ParseTypeName(dBusValues[i].DotNetType))
-                                .AddVariables(
-                                    VariableDeclarator($"arg{i}")
-                                        .WithInitializer(
-                                            EqualsValueClause(
-                                                InvocationExpression(
-                                                    MakeMemberAccessExpression("reader", $"Read{ParseReadWriteMethod(dBusValues[i])}")))))));
-                }
-
-                block = block.AddStatements(
-                    ReturnStatement(
-                        TupleExpression(
-                            SeparatedList(
-                                dBusValues.Select(static (_, i) => Argument(IdentifierName($"arg{i}")))))));
-            }
-
-            _readerExtensions = _readerExtensions.AddMembers(
-                MethodDeclaration(ParseTypeName(returnType), identifier)
-                    .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
-                    .AddParameterListParameters(
-                        Parameter(Identifier("message")).WithType(ParseTypeName("Message")),
-                        Parameter(Identifier("_")).WithType(NullableType(PredefinedType(Token(SyntaxKind.ObjectKeyword)))))
-                    .WithBody(block));
-
-            _readMethodForSignature.Add(signature, identifier);
-
-            return identifier;
         }
     }
 }

@@ -68,55 +68,36 @@ namespace Tmds.DBus.SourceGenerator
                 inArgs.Select(static (x, i) =>
                     Parameter(Identifier(x.Name ?? $"arg{i}")).WithType(ParseTypeName(x.DotNetType)))));
 
+        private static string SanitizeSignature(string signature) =>
+            signature.Replace('{', 'e').Replace("}", null).Replace('(', 'r').Replace(')', 'z');
 
-        internal static (string DotnetType, string[] DotnetInnerTypes, DBusType DBusType) ParseDotNetType(string signature) =>
-            SignatureReader.Transform<(string, string[], DBusType)>(Encoding.ASCII.GetBytes(signature), MapDBusToDotNet);
+        internal static (string DotnetType, string[] InnerDotNetTypes, DBusValue DBusValue, DBusValue[] InnerDBusTypes, DBusType DBusType) ParseDBusValue(string signature) =>
+            SignatureReader.Transform<(string, string[], DBusValue, DBusValue[], DBusType)>(Encoding.ASCII.GetBytes(signature), MapDBusToDotNet);
 
-        private static string ParseReadWriteMethod(DBusValue dBusValue) => dBusValue.DBusType switch
+        private static (string, string[], DBusValue, DBusValue[], DBusType) MapDBusToDotNet(DBusType dBusType, (string, string[], DBusValue, DBusValue[], DBusType)[] inner)
         {
-            DBusType.Byte => "Byte",
-            DBusType.Bool => "Bool",
-            DBusType.Int16 => "Int16",
-            DBusType.UInt16 => "UInt16",
-            DBusType.Int32 => "Int32",
-            DBusType.UInt32 => "UInt32",
-            DBusType.Int64 => "Int64",
-            DBusType.UInt64 => "UInt64",
-            DBusType.Double => "Double",
-            DBusType.String => "String",
-            DBusType.ObjectPath => "ObjectPath",
-            DBusType.Signature => "Signature",
-            DBusType.Variant => "Variant",
-            DBusType.UnixFd => "Handle",
-            DBusType.Array => $"Array<{dBusValue.DotNetInnerTypes![0]}>",
-            DBusType.DictEntry => $"Dictionary<{dBusValue.DotNetInnerTypes![0]}, {dBusValue.DotNetInnerTypes![1]}>",
-            DBusType.Struct => $"Struct<{string.Join(", ", dBusValue.DotNetInnerTypes!)}>",
-            _ => throw new ArgumentOutOfRangeException(nameof(dBusValue.DBusType), dBusValue.DBusType, null)
-        };
-
-        private static (string, string[], DBusType) MapDBusToDotNet(DBusType dBusType, (string, string[], DBusType)[] inner)
-        {
-            string[] innerTypes = inner.Select(static s => s.Item1).ToArray();
+            string[] innerDotNetTypes = inner.Select(static x => x.Item1).ToArray();
+            DBusValue[] innerDBusTypes = inner.Select(static x => x.Item3).ToArray();
             return dBusType switch
             {
-                DBusType.Byte => ("byte", innerTypes, dBusType),
-                DBusType.Bool => ("bool", innerTypes, dBusType),
-                DBusType.Int16 => ("short", innerTypes, dBusType),
-                DBusType.UInt16 => ("ushort", innerTypes, dBusType),
-                DBusType.Int32 => ("int", innerTypes, dBusType),
-                DBusType.UInt32 => ("uint", innerTypes, dBusType),
-                DBusType.Int64 => ("long", innerTypes, dBusType),
-                DBusType.UInt64 => ("ulong", innerTypes, dBusType),
-                DBusType.Double => ("double", innerTypes, dBusType),
-                DBusType.String => ("string", innerTypes, dBusType),
-                DBusType.ObjectPath => ("ObjectPath", innerTypes, dBusType),
-                DBusType.Signature => ("Signature", innerTypes, dBusType),
-                DBusType.Variant => ("object", innerTypes, dBusType),
-                DBusType.UnixFd => ("SafeHandle", innerTypes, dBusType),
-                DBusType.Array => ($"{innerTypes[0]}[]", innerTypes, dBusType),
-                DBusType.DictEntry => ($"Dictionary<{innerTypes[0]}, {innerTypes[1]}>", innerTypes, dBusType),
-                DBusType.Struct when innerTypes.Length == 1 => ($"ValueTuple<{innerTypes[0]}>", innerTypes, dBusType),
-                DBusType.Struct => ($"{TupleOf(innerTypes)}", innerTypes, dBusType),
+                DBusType.Byte => ("byte", innerDotNetTypes, new DBusValue { Type = "y" }, innerDBusTypes, dBusType),
+                DBusType.Bool => ("bool", innerDotNetTypes, new DBusValue { Type = "b" }, innerDBusTypes, dBusType),
+                DBusType.Int16 => ("short", innerDotNetTypes, new DBusValue { Type = "n" }, innerDBusTypes, dBusType),
+                DBusType.UInt16 => ("ushort", innerDotNetTypes, new DBusValue { Type = "q" }, innerDBusTypes, dBusType),
+                DBusType.Int32 => ("int", innerDotNetTypes, new DBusValue { Type = "i" }, innerDBusTypes, dBusType),
+                DBusType.UInt32 => ("uint", innerDotNetTypes, new DBusValue { Type = "u" }, innerDBusTypes, dBusType),
+                DBusType.Int64 => ("long", innerDotNetTypes, new DBusValue { Type = "x" }, innerDBusTypes, dBusType),
+                DBusType.UInt64 => ("ulong", innerDotNetTypes, new DBusValue { Type = "t" }, innerDBusTypes, dBusType),
+                DBusType.Double => ("double", innerDotNetTypes, new DBusValue { Type = "d" }, innerDBusTypes, dBusType),
+                DBusType.String => ("string", innerDotNetTypes, new DBusValue { Type = "s" }, innerDBusTypes, dBusType),
+                DBusType.ObjectPath => ("ObjectPath", innerDotNetTypes, new DBusValue { Type = "o" }, innerDBusTypes, dBusType),
+                DBusType.Signature => ("Signature", innerDotNetTypes, new DBusValue { Type = "g" }, innerDBusTypes, dBusType),
+                DBusType.Variant => ("DBusItem", innerDotNetTypes, new DBusValue { Type = "v" }, innerDBusTypes, dBusType),
+                DBusType.UnixFd => ("SafeHandle", innerDotNetTypes, new DBusValue { Type = "h" }, innerDBusTypes, dBusType),
+                DBusType.Array => ($"{innerDotNetTypes[0]}[]", innerDotNetTypes, new DBusValue { Type = $"a{ParseSignature(innerDBusTypes)}" }, innerDBusTypes, dBusType),
+                DBusType.DictEntry => ($"Dictionary<{innerDotNetTypes[0]}, {innerDotNetTypes[1]}>", innerDotNetTypes, new DBusValue { Type = $"a{{{ParseSignature(innerDBusTypes)}}}" }, innerDBusTypes, dBusType),
+                DBusType.Struct when innerDotNetTypes.Length == 1 => ($"ValueTuple<{innerDotNetTypes[0]}>", innerDotNetTypes, new DBusValue { Type = $"({ParseSignature(innerDBusTypes)}" }, innerDBusTypes, dBusType),
+                DBusType.Struct => ($"{TupleOf(innerDotNetTypes)}", innerDotNetTypes, new DBusValue { Type = $"({ParseSignature(innerDBusTypes)})" }, innerDBusTypes, dBusType),
                 _ => throw new ArgumentOutOfRangeException(nameof(dBusType), dBusType, null)
             };
         }

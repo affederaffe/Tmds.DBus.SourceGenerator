@@ -84,10 +84,13 @@ namespace Tmds.DBus.SourceGenerator
         private string? _dotNetType;
 
         [XmlIgnore]
-        private string[]? _dotNetInnerTypes;
+        private string[]? _innerDotNetTypes;
 
         [XmlIgnore]
         private DBusType _dBusType;
+
+        [XmlIgnore]
+        private DBusValue[]? _innerDBusTypes;
 
         [XmlAttribute("name")]
         public string? Name { get; set; }
@@ -102,20 +105,20 @@ namespace Tmds.DBus.SourceGenerator
             {
                 if (_dotNetType is not null)
                     return _dotNetType;
-                (_dotNetType, _dotNetInnerTypes, _dBusType) = DBusSourceGenerator.ParseDotNetType(Type!);
+                (_dotNetType, _innerDotNetTypes, _, _innerDBusTypes, _dBusType) = DBusSourceGenerator.ParseDBusValue(Type!);
                 return _dotNetType;
             }
         }
 
         [XmlIgnore]
-        public string[]? DotNetInnerTypes
+        public string[]? InnerDotNetTypes
         {
             get
             {
-                if (_dotNetInnerTypes is not null)
-                    return _dotNetInnerTypes;
-                (_dotNetType, _dotNetInnerTypes, _dBusType) = DBusSourceGenerator.ParseDotNetType(Type!);
-                return _dotNetInnerTypes;
+                if (_innerDotNetTypes is not null)
+                    return _innerDotNetTypes;
+                (_dotNetType, _innerDotNetTypes, _, _innerDBusTypes, _dBusType) = DBusSourceGenerator.ParseDBusValue(Type!);
+                return _innerDotNetTypes;
             }
         }
 
@@ -124,10 +127,22 @@ namespace Tmds.DBus.SourceGenerator
         {
             get
             {
-                if (_dBusType != 0)
+                if (_dBusType != DBusType.Invalid)
                     return _dBusType;
-                (_dotNetType, _dotNetInnerTypes, _dBusType) = DBusSourceGenerator.ParseDotNetType(Type!);
+                (_dotNetType, _innerDotNetTypes, _, _innerDBusTypes, _dBusType) = DBusSourceGenerator.ParseDBusValue(Type!);
                 return _dBusType;
+            }
+        }
+
+        [XmlIgnore]
+        public DBusValue[]? InnerDBusTypes
+        {
+            get
+            {
+                if (_innerDBusTypes is not null)
+                    return _innerDBusTypes;
+                (_dotNetType, _innerDotNetTypes, _, _innerDBusTypes, _dBusType) = DBusSourceGenerator.ParseDBusValue(Type!);
+                return _innerDBusTypes;
             }
         }
     }

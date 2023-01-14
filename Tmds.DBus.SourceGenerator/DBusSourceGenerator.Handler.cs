@@ -11,7 +11,7 @@ namespace Tmds.DBus.SourceGenerator
 {
     public partial class DBusSourceGenerator
     {
-        private static ClassDeclarationSyntax GenerateHandler(DBusInterface dBusInterface)
+        private ClassDeclarationSyntax GenerateHandler(DBusInterface dBusInterface)
         {
             ClassDeclarationSyntax cl = ClassDeclaration(Pascalize(dBusInterface.Name!))
                 .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.AbstractKeyword))
@@ -57,7 +57,7 @@ namespace Tmds.DBus.SourceGenerator
             return cl;
         }
 
-        private static void AddHandlerMethods(ref ClassDeclarationSyntax cl, ref SwitchStatementSyntax sw, DBusInterface dBusInterface)
+        private void AddHandlerMethods(ref ClassDeclarationSyntax cl, ref SwitchStatementSyntax sw, DBusInterface dBusInterface)
         {
             if (dBusInterface.Methods is null) return;
 
@@ -114,7 +114,7 @@ namespace Tmds.DBus.SourceGenerator
                                             .WithInitializer(
                                                 EqualsValueClause(
                                                     InvocationExpression(
-                                                        MakeMemberAccessExpression("reader", $"Read{ParseReadWriteMethod(inArgs[i])}")))))));
+                                                        MakeMemberAccessExpression("reader", GetOrAddReadMethod(inArgs[i]))))))));
                     }
 
                     if (outArgs is null || outArgs.Length == 0)
@@ -161,7 +161,7 @@ namespace Tmds.DBus.SourceGenerator
                         switchSectionBlock = switchSectionBlock.AddStatements(
                             ExpressionStatement(
                                 InvocationExpression(
-                                        MakeMemberAccessExpression("writer", $"Write{ParseReadWriteMethod(outArgs[0])}"))
+                                        MakeMemberAccessExpression("writer", GetOrAddWriteMethod(outArgs[0])))
                                     .AddArgumentListArguments(
                                         Argument(
                                             IdentifierName("ret")))));
@@ -173,7 +173,7 @@ namespace Tmds.DBus.SourceGenerator
                             switchSectionBlock = switchSectionBlock.AddStatements(
                                 ExpressionStatement(
                                     InvocationExpression(
-                                            MakeMemberAccessExpression("writer", $"Write{ParseReadWriteMethod(outArgs[i])}"))
+                                            MakeMemberAccessExpression("writer", GetOrAddWriteMethod(outArgs[i])))
                                         .AddArgumentListArguments(
                                             Argument(
                                                 MakeMemberAccessExpression("ret", outArgs[i].Name ?? $"Item{i + 1}")))));
@@ -209,7 +209,7 @@ namespace Tmds.DBus.SourceGenerator
                         BreakStatement()));
         }
 
-        private static void AddHandlerProperties(ref ClassDeclarationSyntax cl, ref SwitchStatementSyntax sw, DBusInterface dBusInterface)
+        private void AddHandlerProperties(ref ClassDeclarationSyntax cl, ref SwitchStatementSyntax sw, DBusInterface dBusInterface)
         {
             if (dBusInterface.Properties is null) return;
             sw = sw.AddSections(
@@ -253,7 +253,7 @@ namespace Tmds.DBus.SourceGenerator
                                         SwitchStatement(IdentifierName("member"))
                                             .WithSections(
                                                 List(
-                                                    dBusInterface.Properties.Select(static dBusProperty =>
+                                                    dBusInterface.Properties.Select(dBusProperty =>
                                                         SwitchSection()
                                                             .AddLabels(
                                                                 CaseSwitchLabel(MakeLiteralExpression(dBusProperty.Name!)))
@@ -272,7 +272,7 @@ namespace Tmds.DBus.SourceGenerator
                                                                         .WithUsingKeyword(Token(SyntaxKind.UsingKeyword)),
                                                                     ExpressionStatement(
                                                                         InvocationExpression(
-                                                                                MakeMemberAccessExpression("writer", $"Write{ParseReadWriteMethod(dBusProperty)}"))
+                                                                                MakeMemberAccessExpression("writer", GetOrAddWriteMethod(dBusProperty)))
                                                                             .AddArgumentListArguments(
                                                                                 Argument(MakeMemberAccessExpression("BackingProperties", dBusProperty.Name!)))),
                                                                     ExpressionStatement(
@@ -335,7 +335,7 @@ namespace Tmds.DBus.SourceGenerator
             AddPropertiesClass(ref cl, dBusInterface);
         }
 
-        private static void AddHandlerSignals(ref ClassDeclarationSyntax cl, DBusInterface dBusInterface)
+        private void AddHandlerSignals(ref ClassDeclarationSyntax cl, DBusInterface dBusInterface)
         {
             if (dBusInterface.Signals is null) return;
             foreach (DBusSignal dBusSignal in dBusInterface.Signals)
@@ -385,7 +385,7 @@ namespace Tmds.DBus.SourceGenerator
                         body = body.AddStatements(
                             ExpressionStatement(
                                 InvocationExpression(
-                                        MakeMemberAccessExpression("writer", $"Write{ParseReadWriteMethod(dBusSignal.Arguments[i])}"))
+                                        MakeMemberAccessExpression("writer", GetOrAddWriteMethod(dBusSignal.Arguments[i])))
                                     .AddArgumentListArguments(
                                         Argument(
                                             IdentifierName(dBusSignal.Arguments[i].Name ?? $"arg{i}")))));

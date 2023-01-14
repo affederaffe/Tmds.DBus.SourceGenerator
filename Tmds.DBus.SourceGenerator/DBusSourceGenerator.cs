@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
@@ -17,16 +18,15 @@ namespace Tmds.DBus.SourceGenerator
     [Generator]
     public partial class DBusSourceGenerator : IIncrementalGenerator
     {
-        private Dictionary<string, string> _readMethodForSignature = null!;
-        private ClassDeclarationSyntax _readerExtensions = null!;
+        private Dictionary<string, MethodDeclarationSyntax> _readMethodExtensions = null!;
+        private Dictionary<string, MethodDeclarationSyntax> _writeMethodExtensions = null!;
 
         private static readonly DiagnosticDescriptor _xmlFileNotFound = new("DBusSG", "Xml File not found", "Could not find file '{0}'", "DBus", DiagnosticSeverity.Error, true);
 
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
-            _readMethodForSignature = new Dictionary<string, string>();
-            _readerExtensions = ClassDeclaration("ReaderExtensions")
-                .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword));
+            _readMethodExtensions = new Dictionary<string, MethodDeclarationSyntax>();
+            _writeMethodExtensions = new Dictionary<string, MethodDeclarationSyntax>();
 
             IncrementalValueProvider<string?> projectPathProvider = context.AnalyzerConfigOptionsProvider
                 .Select(static (provider, _) => provider.GlobalOptions.TryGetValue("build_property.projectdir", out string? value) ? value : null);
@@ -49,6 +49,7 @@ namespace Tmds.DBus.SourceGenerator
                 initializationContext.AddSource("Tmds.DBus.SourceGenerator.DBusHandlerAttribute.cs", MakeDBusHandlerAttribute().GetText(Encoding.UTF8));
                 initializationContext.AddSource("Tmds.DBus.SourceGenerator.PropertyChanges.cs", MakePropertyChangesClass().GetText(Encoding.UTF8));
                 initializationContext.AddSource("Tmds.DBus.SourceGenerator.SignalHelper.cs", MakeSignalHelperClass().GetText(Encoding.UTF8));
+                initializationContext.AddSource("Tmds.DBus.SourceGenerator.VariantExtensions.cs", VariantExtensions);
             });
 
             context.RegisterSourceOutput(combinedProvider, (productionContext, providers) =>
@@ -88,6 +89,7 @@ namespace Tmds.DBus.SourceGenerator
                             NamespaceDeclarationSyntax namespaceDeclaration = NamespaceDeclaration(IdentifierName(@namespace)).AddMembers(typeDeclarationSyntax);
                             CompilationUnitSyntax compilationUnit = MakeCompilationUnit(namespaceDeclaration);
                             productionContext.AddSource($"{@namespace}.{Pascalize(dBusInterface.Name!)}.g.cs", compilationUnit.GetText(Encoding.UTF8));
+
                         }
                     }
                 }
@@ -120,7 +122,22 @@ namespace Tmds.DBus.SourceGenerator
                     }
                 }
 
-                productionContext.AddSource("Tmds.DBus.SourceGenerator.ReaderExtensions.cs", MakeCompilationUnit(NamespaceDeclaration(IdentifierName("Tmds.DBus.SourceGenerator")).AddMembers(_readerExtensions)).GetText(Encoding.UTF8));
+                CompilationUnitSyntax readerExtensions = MakeCompilationUnit(NamespaceDeclaration(IdentifierName("Tmds.DBus.SourceGenerator"))
+                    .AddMembers(
+                        ClassDeclaration("ReaderExtensions")
+                            .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
+                            .WithMembers(
+                                List<MemberDeclarationSyntax>(_readMethodExtensions.Values))));
+
+                CompilationUnitSyntax writerExtensions = MakeCompilationUnit(NamespaceDeclaration(IdentifierName("Tmds.DBus.SourceGenerator"))
+                    .AddMembers(
+                        ClassDeclaration("WriterExtensions")
+                            .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
+                            .WithMembers(
+                                List<MemberDeclarationSyntax>(_writeMethodExtensions.Values))));
+
+                productionContext.AddSource("Tmds.DBus.SourceGenerator.ReaderExtensions.cs", readerExtensions.GetText(Encoding.UTF8));
+                productionContext.AddSource("Tmds.DBus.SourceGenerator.WriterExtensions.cs", writerExtensions.GetText(Encoding.UTF8));
             });
         }
     }
