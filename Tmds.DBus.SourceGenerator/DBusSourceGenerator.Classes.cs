@@ -505,135 +505,151 @@ namespace Tmds.DBus.SourceGenerator
 
     public abstract class DBusItem
     {
-        protected DBusItem(string signature)
-        {
-            Signature = signature;
-        }
-
-        public string Signature { get; }
+        public abstract string Signature { get; }
     }
 
-    public abstract class DBusBasicItem : DBusItem
-    {
-        protected DBusBasicItem(string signature) : base(signature) { }
-    }
+    public abstract class DBusBasicItem : DBusItem { }
 
     public class DBusByteItem : DBusBasicItem
     {
-        public DBusByteItem(byte value) : base("y")
+        public DBusByteItem(byte value)
         {
             Value = value;
         }
+
+        public override string Signature => "y";
 
         public byte Value { get; }
     }
 
     public class DBusBoolItem : DBusBasicItem
     {
-        public DBusBoolItem(bool value) : base("b")
+        public DBusBoolItem(bool value)
         {
             Value = value;
         }
+
+        public override string Signature => "b";
 
         public bool Value { get; }
     }
 
     public class DBusInt16Item : DBusBasicItem
     {
-        public DBusInt16Item(short value) : base("n")
+        public DBusInt16Item(short value)
         {
             Value = value;
         }
+
+        public override string Signature => "n";
 
         public short Value { get; }
     }
 
     public class DBusUInt16Item : DBusBasicItem
     {
-        public DBusUInt16Item(ushort value) : base("q")
+        public DBusUInt16Item(ushort value)
         {
             Value = value;
         }
+
+        public override string Signature => "q";
 
         public ushort Value { get; }
     }
 
     public class DBusInt32Item : DBusBasicItem
     {
-        public DBusInt32Item(int value) : base("i")
+        public DBusInt32Item(int value)
         {
             Value = value;
         }
+
+        public override string Signature => "i";
 
         public int Value { get; }
     }
 
     public class DBusUInt32Item : DBusBasicItem
     {
-        public DBusUInt32Item(uint value) : base("u")
+        public DBusUInt32Item(uint value)
         {
             Value = value;
         }
+
+        public override string Signature => "u";
 
         public uint Value { get; }
     }
 
     public class DBusInt64Item : DBusBasicItem
     {
-        public DBusInt64Item(long value) : base("x")
+        public DBusInt64Item(long value)
         {
             Value = value;
         }
+
+        public override string Signature => "x";
 
         public long Value { get; }
     }
 
     public class DBusUInt64Item : DBusBasicItem
     {
-        public DBusUInt64Item(ulong value) : base("t")
+        public DBusUInt64Item(ulong value)
         {
             Value = value;
         }
+
+        public override string Signature => "t";
 
         public ulong Value { get; }
     }
 
     public class DBusDoubleItem : DBusBasicItem
     {
-        public DBusDoubleItem(double value) : base("d")
+        public DBusDoubleItem(double value)
         {
             Value = value;
         }
+
+        public override string Signature => "d";
 
         public double Value { get; }
     }
 
     public class DBusStringItem : DBusBasicItem
     {
-        public DBusStringItem(string value) : base("s")
+        public DBusStringItem(string value)
         {
             Value = value;
         }
+
+        public override string Signature => "s";
 
         public string Value { get; }
     }
 
     public class DBusObjectPathItem : DBusBasicItem
     {
-        public DBusObjectPathItem(ObjectPath value) : base("o")
+        public DBusObjectPathItem(ObjectPath value)
         {
             Value = value;
         }
+
+        public override string Signature => "o";
 
         public ObjectPath Value { get; }
     }
 
     public class DBusSignatureItem : DBusBasicItem
     {
-        public DBusSignatureItem(Signature value) : base("g")
+        public DBusSignatureItem(Signature value)
         {
             Value = value;
         }
+
+        public override string Signature => "g";
 
         public Signature Value { get; }
     }
@@ -642,10 +658,12 @@ namespace Tmds.DBus.SourceGenerator
     {
         private readonly IList<DBusItem> _value;
 
-        public DBusArrayItem(IEnumerable<DBusItem> value) : base($"a{string.Concat(value.Select(static x => x.Signature))}")
+        public DBusArrayItem(IEnumerable<DBusItem> value)
         {
             _value = value.ToList();
         }
+
+        public override string Signature => $"a{_value[0].Signature}";
 
         public IEnumerator<DBusItem> GetEnumerator() => _value.GetEnumerator();
 
@@ -680,11 +698,13 @@ namespace Tmds.DBus.SourceGenerator
 
     public class DBusDictEntryItem : DBusItem
     {
-        public DBusDictEntryItem(DBusBasicItem key, DBusItem value) : base($"{{{key.Signature}{value.Signature}}}")
+        public DBusDictEntryItem(DBusBasicItem key, DBusItem value)
         {
             Key = key;
             Value = value;
         }
+
+        public override string Signature => $"{{{Key.Signature}{Value.Signature}}}";
 
         public DBusBasicItem Key { get; }
 
@@ -695,16 +715,12 @@ namespace Tmds.DBus.SourceGenerator
     {
         private readonly IList<DBusItem> _value;
 
-        public DBusStructItem(DBusItem value) : base($"({value.Signature})")
-        {
-            _value = new List<DBusItem>();
-            _value.Add(value);
-        }
-
-        public DBusStructItem(IEnumerable<DBusItem> value) : base($"({string.Concat(value.Select(static x => x.Signature))})")
+        public DBusStructItem(IEnumerable<DBusItem> value)
         {
             _value = value.ToList();
         }
+
+        public override string Signature => $"({string.Concat(_value.Select(static x => x.Signature))})";
 
         public IEnumerator<DBusItem> GetEnumerator() => _value.GetEnumerator();
 
