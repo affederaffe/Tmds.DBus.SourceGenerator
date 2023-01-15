@@ -355,7 +355,7 @@ namespace Tmds.DBus.SourceGenerator
                     SignatureReader innerSignatureReader = new(innerSignature);
                     if (!innerSignatureReader.TryRead(out DBusType innerKeyType, out _) ||
                         !innerSignatureReader.TryRead(out DBusType innerValueType, out ReadOnlySpan<byte> innerValueSignature))
-                        throw new InvalidOperationException($"Expected 2 inner types for DictEntry, got {Encoding.UTF8.GetString(innerSignature)}");
+                        throw new InvalidOperationException($"Expected 2 inner types for DictEntry, got {Encoding.UTF8.GetString(innerSignature.ToArray())}");
                     DBusBasicItem key = reader.ReadDBusBasicItem(innerKeyType);
                     DBusItem value = reader.ReadDBusItem(innerValueType, innerValueSignature);
                     return new DBusDictEntryItem(key, value);
