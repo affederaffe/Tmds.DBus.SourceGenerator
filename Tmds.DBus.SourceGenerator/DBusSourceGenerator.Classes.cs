@@ -286,14 +286,16 @@ namespace Tmds.DBus.SourceGenerator
 {
     public static class VariantReader
     {
-        public static DBusItem? ReadDBusVariant(this ref Reader reader)
+        public static DBusVariantItem ReadDBusVariant(this ref Reader reader)
         {
             ReadOnlySpan<byte> signature = reader.ReadSignature();
             SignatureReader signatureReader = new(signature);
-            return !signatureReader.TryRead(out DBusType dBusType, out ReadOnlySpan<byte> innerSignature) ? null : reader.ReadDBusItem(dBusType, innerSignature);
+            if (!signatureReader.TryRead(out DBusType dBusType, out ReadOnlySpan<byte> innerSignature))
+                throw new InvalidOperationException("Unable to read empty variant");
+            return new DBusVariantItem(Encoding.UTF8.GetString(signature.ToArray()), reader.ReadDBusItem(dBusType, innerSignature));
         }
 
-        private static DBusBasicItem ReadDBusBasicItem(this ref Reader reader, DBusType dBusType) =>
+        private static DBusBasicTypeItem ReadDBusBasicTypeItem(this ref Reader reader, DBusType dBusType) =>
             dBusType switch
             {
                 DBusType.Byte => new DBusByteItem(reader.ReadByte()),
@@ -343,20 +345,20 @@ namespace Tmds.DBus.SourceGenerator
                 {
                     SignatureReader innerSignatureReader = new(innerSignature);
                     if (!innerSignatureReader.TryRead(out DBusType innerDBusType, out ReadOnlySpan<byte> innerArraySignature))
-                        return new DBusArrayItem(Enumerable.Empty<DBusItem>());
+                       throw new InvalidOperationException("Failed to deserialize array item");
                     List<DBusItem> items = new();
                     ArrayEnd arrayEnd = reader.ReadArrayStart(innerDBusType);
                     while (reader.HasNext(arrayEnd))
                         items.Add(reader.ReadDBusItem(innerDBusType, innerArraySignature));
-                    return new DBusArrayItem(items);
+                    return new DBusArrayItem(innerDBusType, items);
                 }
                 case DBusType.DictEntry:
                 {
                     SignatureReader innerSignatureReader = new(innerSignature);
-                    if (!innerSignatureReader.TryRead(out DBusType innerKeyType, out _) ||
+                    if (!innerSignatureReader.TryRead(out DBusType innerKeyType, out ReadOnlySpan<byte> _) ||
                         !innerSignatureReader.TryRead(out DBusType innerValueType, out ReadOnlySpan<byte> innerValueSignature))
                         throw new InvalidOperationException($"Expected 2 inner types for DictEntry, got {Encoding.UTF8.GetString(innerSignature.ToArray())}");
-                    DBusBasicItem key = reader.ReadDBusBasicItem(innerKeyType);
+                    DBusBasicTypeItem key = reader.ReadDBusBasicTypeItem(innerKeyType);
                     DBusItem value = reader.ReadDBusItem(innerValueType, innerValueSignature);
                     return new DBusDictEntryItem(key, value);
                 }
@@ -379,73 +381,19 @@ namespace Tmds.DBus.SourceGenerator
 
     public static class VariantWriter
     {
-        public static void WriteDBusVariant(this MessageWriter writer, DBusItem value)
+        public static void WriteDBusVariant(this ref MessageWriter writer, DBusVariantItem value)
         {
-            switch (value)
-            {
-                case DBusByteItem byteItem:
-                    writer.WriteVariantByte(byteItem.Value);
-                    break;
-                case DBusBoolItem boolItem:
-                    writer.WriteVariantBool(boolItem.Value);
-                    break;
-                case DBusInt16Item int16Item:
-                    writer.WriteVariantInt16(int16Item.Value);
-                    break;
-                case DBusUInt16Item uInt16Item:
-                    writer.WriteVariantUInt16(uInt16Item.Value);
-                    break;
-                case DBusInt32Item int32Item:
-                    writer.WriteVariantInt32(int32Item.Value);
-                    break;
-                case DBusUInt32Item uInt32Item:
-                    writer.WriteVariantUInt32(uInt32Item.Value);
-                    break;
-                case DBusInt64Item int64Item:
-                    writer.WriteVariantInt64(int64Item.Value);
-                    break;
-                case DBusUInt64Item uInt64Item:
-                    writer.WriteVariantUInt64(uInt64Item.Value);
-                    break;
-                case DBusDoubleItem doubleItem:
-                    writer.WriteVariantDouble(doubleItem.Value);
-                    break;
-                case DBusStringItem stringItem:
-                    writer.WriteVariantString(stringItem.Value);
-                    break;
-                case DBusObjectPathItem objectPathItem:
-                    writer.WriteVariantObjectPath(objectPathItem.Value);
-                    break;
-                case DBusSignatureItem signatureItem:
-                    writer.WriteVariantSignature(signatureItem.Value.ToString());
-                    break;
-                case DBusArrayItem arrayItem:
-                    writer.WriteString(arrayItem.Signature);
-                    ArrayStart arrayStart = writer.WriteArrayStart(DBusType.Array);
-                    foreach (DBusItem item in arrayItem)
-                        writer.WriteDBusItem(item);
-                    writer.WriteArrayEnd(arrayStart);
-                    break;
-                case DBusDictEntryItem dictEntryItem:
-                    writer.WriteString(dictEntryItem.Signature);
-                    writer.WriteStructureStart();
-                    writer.WriteDBusItem(dictEntryItem.Key);
-                    writer.WriteDBusItem(dictEntryItem.Value);
-                    break;
-                case DBusStructItem structItem:
-                    writer.WriteString(structItem.Signature);
-                    ArrayStart structStart = writer.WriteArrayStart(DBusType.Struct);
-                    foreach (DBusItem item in structItem)
-                        writer.WriteDBusItem(item);
-                    writer.WriteArrayEnd(structStart);
-                    break;
-            }
+            writer.WriteSignature(Encoding.UTF8.GetBytes(value.Signature).AsSpan());
+            writer.WriteDBusItem(value.Value);
         }
 
-        private static void WriteDBusItem(this MessageWriter writer, DBusItem value)
+        public static void WriteDBusItem(this ref MessageWriter writer, DBusItem value)
         {
             switch (value)
             {
+                case DBusVariantItem variantItem:
+                    writer.WriteDBusVariant(variantItem);
+                    break;
                 case DBusByteItem byteItem:
                     writer.WriteByte(byteItem.Value);
                     break;
@@ -483,7 +431,7 @@ namespace Tmds.DBus.SourceGenerator
                     writer.WriteSignature(signatureItem.Value.ToString());
                     break;
                 case DBusArrayItem arrayItem:
-                    ArrayStart arrayStart = writer.WriteArrayStart(DBusType.Array);
+                    ArrayStart arrayStart = writer.WriteArrayStart(arrayItem.ArrayType);
                     foreach (DBusItem item in arrayItem)
                         writer.WriteDBusItem(item);
                     writer.WriteArrayEnd(arrayStart);
@@ -503,153 +451,139 @@ namespace Tmds.DBus.SourceGenerator
         }
     }
 
-    public abstract class DBusItem
+    public abstract class DBusItem { }
+
+    public abstract class DBusBasicTypeItem : DBusItem { }
+
+    public class DBusVariantItem : DBusItem
     {
-        public abstract string Signature { get; }
+        public DBusVariantItem(string signature, DBusItem value)
+        {
+            Signature = signature;
+            Value = value;
+        }
+
+        public string Signature { get; }
+
+        public DBusItem Value { get; }
     }
 
-    public abstract class DBusBasicItem : DBusItem { }
-
-    public class DBusByteItem : DBusBasicItem
+    public class DBusByteItem : DBusBasicTypeItem
     {
         public DBusByteItem(byte value)
         {
             Value = value;
         }
 
-        public override string Signature => "y";
-
         public byte Value { get; }
     }
 
-    public class DBusBoolItem : DBusBasicItem
+    public class DBusBoolItem : DBusBasicTypeItem
     {
         public DBusBoolItem(bool value)
         {
             Value = value;
         }
 
-        public override string Signature => "b";
-
         public bool Value { get; }
     }
 
-    public class DBusInt16Item : DBusBasicItem
+    public class DBusInt16Item : DBusBasicTypeItem
     {
         public DBusInt16Item(short value)
         {
             Value = value;
         }
 
-        public override string Signature => "n";
-
         public short Value { get; }
     }
 
-    public class DBusUInt16Item : DBusBasicItem
+    public class DBusUInt16Item : DBusBasicTypeItem
     {
         public DBusUInt16Item(ushort value)
         {
             Value = value;
         }
 
-        public override string Signature => "q";
-
         public ushort Value { get; }
     }
 
-    public class DBusInt32Item : DBusBasicItem
+    public class DBusInt32Item : DBusBasicTypeItem
     {
         public DBusInt32Item(int value)
         {
             Value = value;
         }
 
-        public override string Signature => "i";
-
         public int Value { get; }
     }
 
-    public class DBusUInt32Item : DBusBasicItem
+    public class DBusUInt32Item : DBusBasicTypeItem
     {
         public DBusUInt32Item(uint value)
         {
             Value = value;
         }
 
-        public override string Signature => "u";
-
         public uint Value { get; }
     }
 
-    public class DBusInt64Item : DBusBasicItem
+    public class DBusInt64Item : DBusBasicTypeItem
     {
         public DBusInt64Item(long value)
         {
             Value = value;
         }
 
-        public override string Signature => "x";
-
         public long Value { get; }
     }
 
-    public class DBusUInt64Item : DBusBasicItem
+    public class DBusUInt64Item : DBusBasicTypeItem
     {
         public DBusUInt64Item(ulong value)
         {
             Value = value;
         }
 
-        public override string Signature => "t";
-
         public ulong Value { get; }
     }
 
-    public class DBusDoubleItem : DBusBasicItem
+    public class DBusDoubleItem : DBusBasicTypeItem
     {
         public DBusDoubleItem(double value)
         {
             Value = value;
         }
 
-        public override string Signature => "d";
-
         public double Value { get; }
     }
 
-    public class DBusStringItem : DBusBasicItem
+    public class DBusStringItem : DBusBasicTypeItem
     {
         public DBusStringItem(string value)
         {
             Value = value;
         }
 
-        public override string Signature => "s";
-
         public string Value { get; }
     }
 
-    public class DBusObjectPathItem : DBusBasicItem
+    public class DBusObjectPathItem : DBusBasicTypeItem
     {
         public DBusObjectPathItem(ObjectPath value)
         {
             Value = value;
         }
 
-        public override string Signature => "o";
-
         public ObjectPath Value { get; }
     }
 
-    public class DBusSignatureItem : DBusBasicItem
+    public class DBusSignatureItem : DBusBasicTypeItem
     {
         public DBusSignatureItem(Signature value)
         {
             Value = value;
         }
-
-        public override string Signature => "g";
 
         public Signature Value { get; }
     }
@@ -658,12 +592,13 @@ namespace Tmds.DBus.SourceGenerator
     {
         private readonly IList<DBusItem> _value;
 
-        public DBusArrayItem(IEnumerable<DBusItem> value)
+        public DBusArrayItem(DBusType arrayType, IEnumerable<DBusItem> value)
         {
             _value = value.ToList();
+            ArrayType = arrayType;
         }
 
-        public override string Signature => $"a{_value[0].Signature}";
+        public DBusType ArrayType { get; }
 
         public IEnumerator<DBusItem> GetEnumerator() => _value.GetEnumerator();
 
@@ -698,15 +633,13 @@ namespace Tmds.DBus.SourceGenerator
 
     public class DBusDictEntryItem : DBusItem
     {
-        public DBusDictEntryItem(DBusBasicItem key, DBusItem value)
+        public DBusDictEntryItem(DBusBasicTypeItem key, DBusItem value)
         {
             Key = key;
             Value = value;
         }
 
-        public override string Signature => $"{{{Key.Signature}{Value.Signature}}}";
-
-        public DBusBasicItem Key { get; }
+        public DBusBasicTypeItem Key { get; }
 
         public DBusItem Value { get; }
     }
@@ -719,8 +652,6 @@ namespace Tmds.DBus.SourceGenerator
         {
             _value = value.ToList();
         }
-
-        public override string Signature => $"({string.Concat(_value.Select(static x => x.Signature))})";
 
         public IEnumerator<DBusItem> GetEnumerator() => _value.GetEnumerator();
 

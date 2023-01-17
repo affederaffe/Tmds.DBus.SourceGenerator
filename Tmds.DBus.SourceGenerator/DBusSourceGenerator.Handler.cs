@@ -153,8 +153,7 @@ namespace Tmds.DBus.SourceGenerator
                                                     InvocationExpression(
                                                             MakeMemberAccessExpression("context", "CreateReplyWriter"))
                                                         .AddArgumentListArguments(
-                                                            Argument(MakeLiteralExpression(ParseSignature(outArgs)!)))))))
-                            .WithUsingKeyword(Token(SyntaxKind.UsingKeyword)));
+                                                            Argument(MakeLiteralExpression(ParseSignature(outArgs)!))))))));
 
                     if (outArgs.Length == 1)
                     {
@@ -187,7 +186,10 @@ namespace Tmds.DBus.SourceGenerator
                                 .AddArgumentListArguments(
                                     Argument(
                                         InvocationExpression(
-                                            MakeMemberAccessExpression("writer", "CreateMessage"))))));
+                                            MakeMemberAccessExpression("writer", "CreateMessage"))))),
+                        ExpressionStatement(
+                            InvocationExpression(
+                                MakeMemberAccessExpression("writer", "Dispose"))));
                 }
 
                 switchSectionBlock = switchSectionBlock.AddStatements(BreakStatement());
@@ -268,8 +270,7 @@ namespace Tmds.DBus.SourceGenerator
                                                                                                 InvocationExpression(
                                                                                                         MakeMemberAccessExpression("context", "CreateReplyWriter"))
                                                                                                     .AddArgumentListArguments(
-                                                                                                        Argument(MakeLiteralExpression(dBusProperty.Type!)))))))
-                                                                        .WithUsingKeyword(Token(SyntaxKind.UsingKeyword)),
+                                                                                                        Argument(MakeLiteralExpression(dBusProperty.Type!))))))),
                                                                     ExpressionStatement(
                                                                         InvocationExpression(
                                                                                 MakeMemberAccessExpression("writer", GetOrAddWriteMethod(dBusProperty)))
@@ -281,6 +282,9 @@ namespace Tmds.DBus.SourceGenerator
                                                                             .AddArgumentListArguments(
                                                                                 Argument(
                                                                                     InvocationExpression(MakeMemberAccessExpression("writer", "CreateMessage"))))),
+                                                                    ExpressionStatement(
+                                                                        InvocationExpression(
+                                                                            MakeMemberAccessExpression("writer", "Dispose"))),
                                                                     BreakStatement()))))),
                                         BreakStatement()),
                                 SwitchSection()
@@ -358,8 +362,7 @@ namespace Tmds.DBus.SourceGenerator
                                 VariableDeclarator("writer")
                                     .WithInitializer(EqualsValueClause(
                                         InvocationExpression(
-                                            MakeMemberAccessExpression("Connection", "GetMessageWriter")))))))
-                        .WithUsingKeyword(Token(SyntaxKind.UsingKeyword)));
+                                            MakeMemberAccessExpression("Connection", "GetMessageWriter"))))))));
 
                 ArgumentListSyntax args = ArgumentList()
                     .AddArguments(
@@ -399,7 +402,10 @@ namespace Tmds.DBus.SourceGenerator
                             .AddArgumentListArguments(
                                 Argument(
                                     InvocationExpression(
-                                        MakeMemberAccessExpression("writer", "CreateMessage"))))));
+                                        MakeMemberAccessExpression("writer", "CreateMessage"))))),
+                    ExpressionStatement(
+                        InvocationExpression(
+                            MakeMemberAccessExpression("writer", "Dispose"))));
 
                 cl = cl.AddMembers(method.WithBody(body));
             }

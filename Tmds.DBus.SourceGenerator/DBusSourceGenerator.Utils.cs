@@ -333,7 +333,7 @@ namespace Tmds.DBus.SourceGenerator
                     .AddParameterListParameters(
                         Parameter(Identifier("writer"))
                             .WithType(ParseTypeName("MessageWriter"))
-                            .AddModifiers(Token(SyntaxKind.ThisKeyword)),
+                            .AddModifiers(Token(SyntaxKind.ThisKeyword), Token(SyntaxKind.RefKeyword)),
                         Parameter(Identifier("values"))
                             .WithType(ParseTypeName(dBusValue.DotNetType)))
                     .WithBody(
@@ -376,7 +376,7 @@ namespace Tmds.DBus.SourceGenerator
                     .AddParameterListParameters(
                         Parameter(Identifier("writer"))
                             .WithType(ParseTypeName("MessageWriter"))
-                            .AddModifiers(Token(SyntaxKind.ThisKeyword)),
+                            .AddModifiers(Token(SyntaxKind.ThisKeyword), Token(SyntaxKind.RefKeyword)),
                         Parameter(Identifier("values"))
                             .WithType(ParseTypeName(dBusValue.DotNetType)))
                     .WithBody(
@@ -429,7 +429,7 @@ namespace Tmds.DBus.SourceGenerator
                     .AddParameterListParameters(
                         Parameter(Identifier("writer"))
                             .WithType(ParseTypeName("MessageWriter"))
-                            .AddModifiers(Token(SyntaxKind.ThisKeyword)),
+                            .AddModifiers(Token(SyntaxKind.ThisKeyword), Token(SyntaxKind.RefKeyword)),
                         Parameter(Identifier("value"))
                             .WithType(ParseTypeName(dBusValue.DotNetType)))
                     .WithBody(

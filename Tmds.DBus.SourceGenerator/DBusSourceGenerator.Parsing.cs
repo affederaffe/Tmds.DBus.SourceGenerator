@@ -92,7 +92,7 @@ namespace Tmds.DBus.SourceGenerator
                 DBusType.String => ("string", innerDotNetTypes, new DBusValue { Type = "s" }, innerDBusTypes, dBusType),
                 DBusType.ObjectPath => ("ObjectPath", innerDotNetTypes, new DBusValue { Type = "o" }, innerDBusTypes, dBusType),
                 DBusType.Signature => ("Signature", innerDotNetTypes, new DBusValue { Type = "g" }, innerDBusTypes, dBusType),
-                DBusType.Variant => ("DBusItem", innerDotNetTypes, new DBusValue { Type = "v" }, innerDBusTypes, dBusType),
+                DBusType.Variant => ("DBusVariantItem", innerDotNetTypes, new DBusValue { Type = "v" }, innerDBusTypes, dBusType),
                 DBusType.UnixFd => ("SafeHandle", innerDotNetTypes, new DBusValue { Type = "h" }, innerDBusTypes, dBusType),
                 DBusType.Array => ($"{innerDotNetTypes[0]}[]", innerDotNetTypes, new DBusValue { Type = $"a{ParseSignature(innerDBusTypes)}" }, innerDBusTypes, dBusType),
                 DBusType.DictEntry => ($"Dictionary<{innerDotNetTypes[0]}, {innerDotNetTypes[1]}>", innerDotNetTypes, new DBusValue { Type = $"a{{{ParseSignature(innerDBusTypes)}}}" }, innerDBusTypes, dBusType),

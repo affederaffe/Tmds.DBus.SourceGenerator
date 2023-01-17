@@ -437,21 +437,32 @@ namespace Tmds.DBus.SourceGenerator
                 args = args.AddArguments(Argument(MakeLiteralExpression(signature)));
 
             return Block(
-                    LocalDeclarationStatement(VariableDeclaration(ParseTypeName("MessageWriter"),
-                            SingletonSeparatedList(
-                                VariableDeclarator("writer")
-                                    .WithInitializer(EqualsValueClause(
-                                        InvocationExpression(
-                                            MakeMemberAccessExpression("_connection", "GetMessageWriter")))))))
-                        .WithUsingKeyword(Token(SyntaxKind.UsingKeyword)),
+                    LocalDeclarationStatement(
+                            VariableDeclaration(ParseTypeName("MessageWriter"),
+                                SingletonSeparatedList(
+                                    VariableDeclarator("writer")
+                                        .WithInitializer(EqualsValueClause(
+                                            InvocationExpression(
+                                                MakeMemberAccessExpression("_connection", "GetMessageWriter"))))))),
                     ExpressionStatement(
                         InvocationExpression(
                                 MakeMemberAccessExpression("writer", "WriteMethodCallHeader"))
                             .WithArgumentList(args)))
                 .AddStatements(statements)
-                .AddStatements(ReturnStatement(
-                    InvocationExpression(
-                        MakeMemberAccessExpression("writer", "CreateMessage"))));
+                .AddStatements(
+                    LocalDeclarationStatement(
+                        VariableDeclaration(ParseTypeName("MessageBuffer"))
+                            .AddVariables(
+                                VariableDeclarator("message")
+                                    .WithInitializer(
+                                        EqualsValueClause(
+                                            InvocationExpression(
+                                                MakeMemberAccessExpression("writer", "CreateMessage")))))),
+                    ExpressionStatement(
+                        InvocationExpression(
+                            MakeMemberAccessExpression("writer", "Dispose"))),
+                    ReturnStatement(
+                        IdentifierName("message")));
         }
     }
 }
