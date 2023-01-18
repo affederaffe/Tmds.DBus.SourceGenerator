@@ -51,7 +51,7 @@ namespace Tmds.DBus.SourceGenerator
         {
             0 or null => null,
             1 => dBusValues[0].DotNetType,
-            _ => TupleOf(dBusValues.Select(static (x, i) => $"{x.DotNetType} {x.Name ?? $"Item{i + 1}"}"))
+            _ => TupleOf(dBusValues.Select(static (x, i) => $"{x.DotNetType} {(x.Name is not null ? SanitizeIdentifier(x.Name) : $"Item{i + 1}")}"))
         };
 
         private static string ParseTaskReturnType(DBusValue dBusValue) => ParseTaskReturnType(new[] { dBusValue });
@@ -60,16 +60,18 @@ namespace Tmds.DBus.SourceGenerator
         {
             0 or null => "Task",
             1 => $"Task<{dBusValues[0].DotNetType}>",
-            _ => $"Task<{TupleOf(dBusValues.Select(static (x, i) => $"{x.DotNetType} {x.Name ?? $"Item{i + 1}"}"))}>"
+            _ => $"Task<{TupleOf(dBusValues.Select(static (x, i) => $"{x.DotNetType} {(x.Name is not null ? SanitizeIdentifier(x.Name) : $"Item{i + 1}")}"))}>"
         };
 
         private static ParameterListSyntax ParseParameterList(IEnumerable<DBusValue> inArgs) => ParameterList(
             SeparatedList(
                 inArgs.Select(static (x, i) =>
-                    Parameter(Identifier(x.Name ?? $"arg{i}")).WithType(ParseTypeName(x.DotNetType)))));
+                    Parameter(Identifier(x.Name is not null ? SanitizeIdentifier(x.Name) : $"arg{i}")).WithType(ParseTypeName(x.DotNetType)))));
 
         private static string SanitizeSignature(string signature) =>
             signature.Replace('{', 'e').Replace("}", null).Replace('(', 'r').Replace(')', 'z');
+
+        private static string SanitizeIdentifier(string identifier) => $"@{identifier}";
 
         internal static (string DotnetType, string[] InnerDotNetTypes, DBusValue DBusValue, DBusValue[] InnerDBusTypes, DBusType DBusType) ParseDBusValue(string signature) =>
             SignatureReader.Transform<(string, string[], DBusValue, DBusValue[], DBusType)>(Encoding.ASCII.GetBytes(signature), MapDBusToDotNet);

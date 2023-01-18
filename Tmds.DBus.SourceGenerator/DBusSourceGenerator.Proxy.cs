@@ -68,12 +68,12 @@ namespace Tmds.DBus.SourceGenerator
                         InvocationExpression(
                                 MakeMemberAccessExpression("writer", GetOrAddWriteMethod(x)))
                             .AddArgumentListArguments(
-                                Argument(IdentifierName(x.Name ?? $"arg{i}")))))
+                                Argument(IdentifierName(x.Name is not null ? SanitizeIdentifier(x.Name) : $"arg{i}")))))
                     .ToArray() ?? Array.Empty<ExpressionStatementSyntax>();
 
-                BlockSyntax createMessageBody = MakeCreateMessageBody(IdentifierName("Interface"), dBusMethod.Name!, ParseSignature(inArgs), statements);
+                BlockSyntax createMessageBody = MakeCreateMessageBody(IdentifierName("Interface"), Pascalize(dBusMethod.Name!), ParseSignature(inArgs), statements);
 
-                MethodDeclarationSyntax proxyMethod = MethodDeclaration(ParseTypeName(returnType), $"{dBusMethod.Name}Async")
+                MethodDeclarationSyntax proxyMethod = MethodDeclaration(ParseTypeName(returnType), $"{Pascalize(dBusMethod.Name!)}Async")
                     .AddModifiers(Token(SyntaxKind.PublicKeyword));
 
                 if (inArgs is not null)
@@ -119,7 +119,7 @@ namespace Tmds.DBus.SourceGenerator
                     Argument(IdentifierName("handler")),
                     Argument(IdentifierName("emitOnCapturedContext")));
 
-                MethodDeclarationSyntax watchSignalMethod = MethodDeclaration(ParseTypeName("ValueTask<IDisposable>"), $"Watch{dBusSignal.Name}Async")
+                MethodDeclarationSyntax watchSignalMethod = MethodDeclaration(ParseTypeName("ValueTask<IDisposable>"), $"Watch{Pascalize(dBusSignal.Name!)}Async")
                     .AddModifiers(Token(SyntaxKind.PublicKeyword))
                     .WithParameterList(parameters)
                     .WithBody(
@@ -258,7 +258,7 @@ namespace Tmds.DBus.SourceGenerator
                         Argument(
                             MakeMemberAccessExpression("ReaderExtensions", GetOrAddReadMessageMethod(dBusProperty))));
 
-                return MethodDeclaration(ParseTypeName(ParseTaskReturnType(dBusProperty)), $"Get{dBusProperty.Name}Async")
+                return MethodDeclaration(ParseTypeName(ParseTaskReturnType(dBusProperty)), $"Get{Pascalize(dBusProperty.Name!)}Async")
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .WithBody(
                     MakeCallMethodReturnBody(args, createMessageBody));

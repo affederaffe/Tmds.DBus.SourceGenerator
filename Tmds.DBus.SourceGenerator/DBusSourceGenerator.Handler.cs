@@ -78,7 +78,7 @@ namespace Tmds.DBus.SourceGenerator
 
                 BlockSyntax switchSectionBlock = Block();
 
-                string abstractMethodName = $"On{dBusMethod.Name}";
+                string abstractMethodName = $"On{Pascalize(dBusMethod.Name!)}";
 
                 MethodDeclarationSyntax abstractMethod = outArgs?.Length > 0
                     ? MethodDeclaration(ParseTypeName(ParseReturnType(outArgs)!), abstractMethodName)
@@ -110,7 +110,7 @@ namespace Tmds.DBus.SourceGenerator
                             LocalDeclarationStatement(
                                 VariableDeclaration(ParseTypeName(inArgs[i].DotNetType))
                                     .AddVariables(
-                                        VariableDeclarator(inArgs[i].Name ?? $"arg{i}")
+                                        VariableDeclarator(inArgs[i].Name is not null ? SanitizeIdentifier(inArgs[i].Name!) : $"arg{i}")
                                             .WithInitializer(
                                                 EqualsValueClause(
                                                     InvocationExpression(
@@ -124,7 +124,7 @@ namespace Tmds.DBus.SourceGenerator
                                         IdentifierName(abstractMethodName))
                                     .AddArgumentListArguments(
                                         inArgs.Select(static (x, i) =>
-                                            Argument(IdentifierName(x.Name ?? $"arg{i}"))).ToArray())));
+                                            Argument(IdentifierName(x.Name is not null ? SanitizeIdentifier(x.Name) : $"arg{i}"))).ToArray())));
                 }
 
                 if (outArgs?.Length > 0)
@@ -141,7 +141,7 @@ namespace Tmds.DBus.SourceGenerator
                                                             IdentifierName(abstractMethodName))
                                                         .AddArgumentListArguments(
                                                             inArgs.Select(static (x, i) =>
-                                                                Argument(IdentifierName(x.Name ?? $"arg{i}"))).ToArray())
+                                                                Argument(IdentifierName(x.Name is not null ? SanitizeIdentifier(x.Name) : $"arg{i}"))).ToArray())
                                                     : InvocationExpression(
                                                         IdentifierName(abstractMethodName)))))),
                         LocalDeclarationStatement(
@@ -175,7 +175,7 @@ namespace Tmds.DBus.SourceGenerator
                                             MakeMemberAccessExpression("writer", GetOrAddWriteMethod(outArgs[i])))
                                         .AddArgumentListArguments(
                                             Argument(
-                                                MakeMemberAccessExpression("ret", outArgs[i].Name ?? $"Item{i + 1}")))));
+                                                MakeMemberAccessExpression("ret", outArgs[i].Name is not null ? SanitizeIdentifier(outArgs[i].Name!) : $"Item{i + 1}")))));
                         }
                     }
 
@@ -352,7 +352,7 @@ namespace Tmds.DBus.SourceGenerator
                         ParameterList(
                             SeparatedList(
                                 dBusSignal.Arguments.Select(
-                                    static (x, i) => Parameter(Identifier(x.Name ?? $"arg{i}")).WithType(ParseTypeName(x.DotNetType))))));
+                                    static (x, i) => Parameter(Identifier(x.Name is not null ? SanitizeIdentifier(x.Name) : $"arg{i}")).WithType(ParseTypeName(x.DotNetType))))));
 
                 BlockSyntax body = Block();
 
