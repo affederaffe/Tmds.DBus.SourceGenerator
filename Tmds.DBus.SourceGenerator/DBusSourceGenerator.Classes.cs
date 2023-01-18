@@ -292,7 +292,7 @@ namespace Tmds.DBus.SourceGenerator
             SignatureReader signatureReader = new(signature);
             if (!signatureReader.TryRead(out DBusType dBusType, out ReadOnlySpan<byte> innerSignature))
                 throw new InvalidOperationException("Unable to read empty variant");
-            return reader.ReadDBusItem(dBusType, innerSignature);
+            return reader.ReadDBusItem(dBusType, innerSignature) as DBusVariantItem;
         }
 
         private static DBusBasicTypeItem ReadDBusBasicTypeItem(this ref Reader reader, DBusType dBusType) =>
@@ -442,10 +442,9 @@ namespace Tmds.DBus.SourceGenerator
                     writer.WriteDBusItem(dictEntryItem.Value);
                     break;
                 case DBusStructItem structItem:
-                    ArrayStart structStart = writer.WriteArrayStart(DBusType.Struct);
+                    writer.WriteStructureStart();
                     foreach (DBusItem item in structItem)
                         writer.WriteDBusItem(item);
-                    writer.WriteArrayEnd(structStart);
                     break;
             }
         }
