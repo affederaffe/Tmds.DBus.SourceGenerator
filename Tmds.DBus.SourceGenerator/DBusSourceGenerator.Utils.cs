@@ -437,15 +437,14 @@ namespace Tmds.DBus.SourceGenerator
                                 ExpressionStatement(
                                     InvocationExpression(
                                         MakeMemberAccessExpression("writer", "WriteStructureStart"))))
-                            .WithStatements(
-                                List<StatementSyntax>(
-                                    dBusValue.InnerDBusTypes!.Select(
+                            .AddStatements(
+                                dBusValue.InnerDBusTypes!.Select(
                                         (x, i) => ExpressionStatement(
                                             InvocationExpression(
                                                     MakeMemberAccessExpression("writer", GetOrAddWriteMethod(x)))
                                                 .AddArgumentListArguments(
                                                     Argument(
-                                                        MakeMemberAccessExpression("value", $"Item{i + 1}")))))))));
+                                                        MakeMemberAccessExpression("value", $"Item{i + 1}"))))).ToArray())));
 
             return identifier;
         }
