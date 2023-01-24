@@ -292,7 +292,7 @@ namespace Tmds.DBus.SourceGenerator
             SignatureReader signatureReader = new(signature);
             if (!signatureReader.TryRead(out DBusType dBusType, out ReadOnlySpan<byte> innerSignature))
                 throw new InvalidOperationException("Unable to read empty variant");
-            return reader.ReadDBusItem(dBusType, innerSignature) as DBusVariantItem;
+            return new DBusVariantItem(Encoding.UTF8.GetString(innerSignature.ToArray()), reader.ReadDBusItem(dBusType, innerSignature));
         }
 
         private static DBusBasicTypeItem ReadDBusBasicTypeItem(this ref Reader reader, DBusType dBusType) =>
