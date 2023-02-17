@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.IO;
 using System.Text;
 using System.Xml;
@@ -21,104 +20,64 @@ namespace Tmds.DBus.SourceGenerator
         private Dictionary<string, MethodDeclarationSyntax> _readMethodExtensions = null!;
         private Dictionary<string, MethodDeclarationSyntax> _writeMethodExtensions = null!;
 
-        private static readonly DiagnosticDescriptor _xmlFileNotFound = new("DBusSG", "Xml File not found", "Could not find file '{0}'", "DBus", DiagnosticSeverity.Error, true);
-
         public void Initialize(IncrementalGeneratorInitializationContext context)
         {
             _readMethodExtensions = new Dictionary<string, MethodDeclarationSyntax>();
             _writeMethodExtensions = new Dictionary<string, MethodDeclarationSyntax>();
 
-            IncrementalValueProvider<string?> projectPathProvider = context.AnalyzerConfigOptionsProvider
-                .Select(static (provider, _) => provider.GlobalOptions.TryGetValue("build_property.projectdir", out string? value) ? value : null);
+            XmlSerializer xmlSerializer = new(typeof(DBusNode));
+            XmlReaderSettings xmlReaderSettings = new()
+            {
+                DtdProcessing = DtdProcessing.Ignore,
+                IgnoreWhitespace = true,
+                IgnoreComments = true
+            };
 
-            IncrementalValuesProvider<GeneratorAttributeSyntaxContext> classWithInterfaceAttribute = context.SyntaxProvider.ForAttributeWithMetadataName(
-                "Tmds.DBus.SourceGenerator.DBusInterfaceAttribute",
-                static (node, _) => node is ClassDeclarationSyntax,
-                static (ctx, _) => ctx);
-
-            IncrementalValuesProvider<GeneratorAttributeSyntaxContext> classWithHandlerAttribute = context.SyntaxProvider.ForAttributeWithMetadataName(
-                "Tmds.DBus.SourceGenerator.DBusHandlerAttribute",
-                static (node, _) => node is ClassDeclarationSyntax,
-                static (ctx, _) => ctx);
-
-            IncrementalValueProvider<((ImmutableArray<GeneratorAttributeSyntaxContext> Interfaces, ImmutableArray<GeneratorAttributeSyntaxContext> Handlers) ClassesWithAttribute, string? ProjectPath)> combinedProvider = classWithInterfaceAttribute.Collect().Combine(classWithHandlerAttribute.Collect()).Combine(projectPathProvider);
+            IncrementalValuesProvider<(DBusNode, string)> generatorProvider = context.AdditionalTextsProvider
+                .Where(static x => x.Path.EndsWith(".xml", StringComparison.Ordinal))
+                .Combine(context.AnalyzerConfigOptionsProvider)
+                .Select((x, _) =>
+                {
+                    if (!x.Right.GetOptions(x.Left).TryGetValue("build_metadata.AdditionalFiles.DBusGeneratorMode", out string? generatorMode)) return null;
+                    if (xmlSerializer.Deserialize(XmlReader.Create(new StringReader(x.Left.GetText()!.ToString()), xmlReaderSettings)) is not DBusNode dBusNode) return null;
+                    if (dBusNode.Interfaces is null) return null;
+                    return Tuple.Create(dBusNode, generatorMode);
+                })
+                .Where(static x => x is not null)
+                .Select(static (x, _) => x.ToValueTuple());
 
             context.RegisterPostInitializationOutput(static initializationContext =>
             {
-                initializationContext.AddSource("Tmds.DBus.SourceGenerator.DBusInterfaceAttribute.cs", MakeDBusInterfaceAttribute().GetText(Encoding.UTF8));
-                initializationContext.AddSource("Tmds.DBus.SourceGenerator.DBusHandlerAttribute.cs", MakeDBusHandlerAttribute().GetText(Encoding.UTF8));
                 initializationContext.AddSource("Tmds.DBus.SourceGenerator.PropertyChanges.cs", MakePropertyChangesClass().GetText(Encoding.UTF8));
                 initializationContext.AddSource("Tmds.DBus.SourceGenerator.SignalHelper.cs", MakeSignalHelperClass().GetText(Encoding.UTF8));
                 initializationContext.AddSource("Tmds.DBus.SourceGenerator.VariantExtensions.cs", VariantExtensions);
             });
 
-            context.RegisterSourceOutput(combinedProvider, (productionContext, providers) =>
+            context.RegisterSourceOutput(generatorProvider.Collect(), (productionContext, provider) =>
             {
-                if (providers.ProjectPath is null) return;
-
-                XmlSerializer xmlSerializer = new(typeof(DBusNode));
-                XmlReaderSettings xmlReaderSettings = new()
+                foreach ((DBusNode Node, string GeneratorMode) value in provider)
                 {
-                    Async = true,
-                    DtdProcessing = DtdProcessing.Ignore,
-                    IgnoreWhitespace = true,
-                    IgnoreComments = true
-                };
-
-                foreach (GeneratorAttributeSyntaxContext syntaxContext in providers.ClassesWithAttribute.Interfaces)
-                {
-                    foreach (AttributeData attributeData in syntaxContext.Attributes)
+                    switch (value.GeneratorMode)
                     {
-                        if (attributeData.ConstructorArguments[0].Value is not string xmlPath) continue;
-                        string path = Path.Combine(providers.ProjectPath, xmlPath);
-                        if (!File.Exists(path))
-                        {
-                            productionContext.ReportDiagnostic(Diagnostic.Create(_xmlFileNotFound, syntaxContext.TargetNode.GetLocation(), path));
-                            return;
-                        }
+                        case "Proxy":
+                            foreach (DBusInterface dBusInterface in value.Node.Interfaces!)
+                            {
+                                TypeDeclarationSyntax typeDeclarationSyntax = GenerateProxy(dBusInterface);
+                                NamespaceDeclarationSyntax namespaceDeclaration = NamespaceDeclaration(IdentifierName("Tmds.DBus.SourceGenerator")).AddMembers(typeDeclarationSyntax);
+                                CompilationUnitSyntax compilationUnit = MakeCompilationUnit(namespaceDeclaration);
+                                productionContext.AddSource($"Tmds.DBus.SourceGenerator.{Pascalize(dBusInterface.Name!)}.g.cs", compilationUnit.GetText(Encoding.UTF8));
 
-                        if (xmlSerializer.Deserialize(XmlReader.Create(File.OpenRead(path), xmlReaderSettings)) is not DBusNode dBusNode) continue;
-                        if (dBusNode.Interfaces is null) continue;
-                        ClassDeclarationSyntax classNode = (ClassDeclarationSyntax)syntaxContext.TargetNode;
-                        INamedTypeSymbol? declaredClass = syntaxContext.SemanticModel.GetDeclaredSymbol(classNode);
-                        if (declaredClass is null) continue;
-                        string @namespace = declaredClass.ContainingNamespace.ToDisplayString();
-                        foreach (DBusInterface dBusInterface in dBusNode.Interfaces)
-                        {
-                            TypeDeclarationSyntax typeDeclarationSyntax = GenerateProxy(dBusInterface);
-                            NamespaceDeclarationSyntax namespaceDeclaration = NamespaceDeclaration(IdentifierName(@namespace)).AddMembers(typeDeclarationSyntax);
-                            CompilationUnitSyntax compilationUnit = MakeCompilationUnit(namespaceDeclaration);
-                            productionContext.AddSource($"{@namespace}.{Pascalize(dBusInterface.Name!)}.g.cs", compilationUnit.GetText(Encoding.UTF8));
-
-                        }
-                    }
-                }
-
-                foreach (GeneratorAttributeSyntaxContext syntaxContext in providers.ClassesWithAttribute.Handlers)
-                {
-                    foreach (AttributeData attributeData in syntaxContext.Attributes)
-                    {
-                        if (attributeData.ConstructorArguments[0].Value is not string xmlPath) continue;
-                        string path = Path.Combine(providers.ProjectPath, xmlPath);
-                        if (!File.Exists(path))
-                        {
-                            productionContext.ReportDiagnostic(Diagnostic.Create(_xmlFileNotFound, syntaxContext.TargetNode.GetLocation(), path));
-                            return;
-                        }
-
-                        if (xmlSerializer.Deserialize(XmlReader.Create(File.OpenRead(path), xmlReaderSettings)) is not DBusNode dBusNode) continue;
-                        if (dBusNode.Interfaces is null) continue;
-                        ClassDeclarationSyntax classNode = (ClassDeclarationSyntax)syntaxContext.TargetNode;
-                        INamedTypeSymbol? declaredClass = syntaxContext.SemanticModel.GetDeclaredSymbol(classNode);
-                        if (declaredClass is null) continue;
-                        string @namespace = declaredClass.ContainingNamespace.ToDisplayString();
-                        foreach (DBusInterface dBusInterface in dBusNode.Interfaces)
-                        {
-                            TypeDeclarationSyntax typeDeclarationSyntax = GenerateHandler(dBusInterface);
-                            NamespaceDeclarationSyntax namespaceDeclaration = NamespaceDeclaration(IdentifierName(@namespace)).AddMembers(typeDeclarationSyntax);
-                            CompilationUnitSyntax compilationUnit = MakeCompilationUnit(namespaceDeclaration);
-                            productionContext.AddSource($"{@namespace}.{Pascalize(dBusInterface.Name!)}.g.cs", compilationUnit.GetText(Encoding.UTF8));
-                        }
+                            }
+                            break;
+                        case "Handler":
+                            foreach (DBusInterface dBusInterface in value.Node.Interfaces!)
+                            {
+                                TypeDeclarationSyntax typeDeclarationSyntax = GenerateHandler(dBusInterface);
+                                NamespaceDeclarationSyntax namespaceDeclaration = NamespaceDeclaration(IdentifierName("Tmds.DBus.SourceGenerator")).AddMembers(typeDeclarationSyntax);
+                                CompilationUnitSyntax compilationUnit = MakeCompilationUnit(namespaceDeclaration);
+                                productionContext.AddSource($"Tmds.DBus.SourceGenerator.{Pascalize(dBusInterface.Name!)}.g.cs", compilationUnit.GetText(Encoding.UTF8));
+                            }
+                            break;
                     }
                 }
 

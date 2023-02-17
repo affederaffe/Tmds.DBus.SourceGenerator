@@ -8,58 +8,6 @@ namespace Tmds.DBus.SourceGenerator
 {
     public partial class DBusSourceGenerator
     {
-        private static CompilationUnitSyntax MakeDBusInterfaceAttribute() => MakeCompilationUnit(
-            NamespaceDeclaration(IdentifierName("Tmds.DBus.SourceGenerator"))
-                .AddMembers(
-                    ClassDeclaration("DBusInterfaceAttribute")
-                        .AddModifiers(Token(SyntaxKind.PublicKeyword))
-                        .AddBaseListTypes(SimpleBaseType(IdentifierName("Attribute")))
-                        .AddAttributeLists(
-                            AttributeList()
-                                .AddAttributes(
-                                    Attribute(IdentifierName("AttributeUsage"))
-                                        .AddArgumentListArguments(
-                                            AttributeArgument(
-                                                MakeMemberAccessExpression("AttributeTargets", "Class")),
-                                            AttributeArgument(
-                                                    LiteralExpression(SyntaxKind.TrueLiteralExpression))
-                                                .WithNameEquals(
-                                                    NameEquals("AllowMultiple")))))
-                        .AddMembers(
-                            ConstructorDeclaration("DBusInterfaceAttribute")
-                                .AddModifiers(Token(SyntaxKind.PublicKeyword))
-                                .AddParameterListParameters(
-                                    Parameter(Identifier("path")).WithType(PredefinedType(Token(SyntaxKind.StringKeyword))))
-                                .WithBody(
-                                    Block(MakeAssignmentExpressionStatement("Path", "path"))),
-                            MakeGetOnlyProperty(PredefinedType(Token(SyntaxKind.StringKeyword)), "Path", Token(SyntaxKind.PublicKeyword)))));
-
-        private static CompilationUnitSyntax MakeDBusHandlerAttribute() => MakeCompilationUnit(
-            NamespaceDeclaration(IdentifierName("Tmds.DBus.SourceGenerator"))
-                .AddMembers(
-                    ClassDeclaration("DBusHandlerAttribute")
-                        .AddModifiers(Token(SyntaxKind.PublicKeyword))
-                        .AddBaseListTypes(SimpleBaseType(IdentifierName("Attribute")))
-                        .AddAttributeLists(
-                            AttributeList()
-                                .AddAttributes(
-                                    Attribute(IdentifierName("AttributeUsage"))
-                                        .AddArgumentListArguments(
-                                            AttributeArgument(
-                                                MakeMemberAccessExpression("AttributeTargets", "Class")),
-                                            AttributeArgument(
-                                                    LiteralExpression(SyntaxKind.TrueLiteralExpression))
-                                                .WithNameEquals(
-                                                    NameEquals("AllowMultiple")))))
-                        .AddMembers(
-                            ConstructorDeclaration("DBusHandlerAttribute")
-                                .AddModifiers(Token(SyntaxKind.PublicKeyword))
-                                .AddParameterListParameters(
-                                    Parameter(Identifier("path")).WithType(PredefinedType(Token(SyntaxKind.StringKeyword))))
-                                .WithBody(
-                                    Block(MakeAssignmentExpressionStatement("Path", "path"))),
-                            MakeGetOnlyProperty(PredefinedType(Token(SyntaxKind.StringKeyword)), "Path", Token(SyntaxKind.PublicKeyword)))));
-
         private static CompilationUnitSyntax MakePropertyChangesClass() => MakeCompilationUnit(
             NamespaceDeclaration(IdentifierName("Tmds.DBus.SourceGenerator"))
                 .AddMembers(

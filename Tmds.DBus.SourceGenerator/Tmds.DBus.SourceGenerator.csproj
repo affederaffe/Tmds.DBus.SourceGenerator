@@ -1,15 +1,38 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <LangVersion>latest</LangVersion>
         <TargetFramework>netstandard2.0</TargetFramework>
+        <LangVersion>latest</LangVersion>
         <Nullable>enable</Nullable>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <EnforceExtendedAnalyzerRules>false</EnforceExtendedAnalyzerRules>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <DevelopmentDependency>true</DevelopmentDependency>
+    </PropertyGroup>
+    
+    <PropertyGroup>
+        <Version>0.0.1</Version>
+        <PackageId>Tmds.DBus.SourceGenerator</PackageId>
+        <Authors>affederaffe</Authors>
+        <Description>A roslyn source generator for creating proxies targeting the Tmds.DBus.Protocol API</Description>
+        <PackageTags>DBus;SourceGenerator</PackageTags>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageProjectUrl>https://github.com/affederaffe/Tmds.DBus.SourceGenerator</PackageProjectUrl>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.3" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" PrivateAssets="all" />
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.4.0" PrivateAssets="all" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="DBusGeneratorMode" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="Tmds.DBus.SourceGenerator.props" Pack="true" PackagePath="build" Visible="false" />
+        <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+        <None Include="$(OutputPath)\$(AssemblyName).pdb" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
     </ItemGroup>
 
 </Project>
