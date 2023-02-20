@@ -46,15 +46,9 @@ namespace Tmds.DBus.SourceGenerator
                 .Where(static x => x is not null)
                 .Select(static (x, _) => x.ToValueTuple());
 
-            context.RegisterPostInitializationOutput(static initializationContext =>
-            {
-                initializationContext.AddSource("Tmds.DBus.SourceGenerator.PropertyChanges.cs", MakePropertyChangesClass().GetText(Encoding.UTF8));
-                initializationContext.AddSource("Tmds.DBus.SourceGenerator.SignalHelper.cs", MakeSignalHelperClass().GetText(Encoding.UTF8));
-                initializationContext.AddSource("Tmds.DBus.SourceGenerator.VariantExtensions.cs", VariantExtensions);
-            });
-
             context.RegisterSourceOutput(generatorProvider.Collect(), (productionContext, provider) =>
             {
+                if (provider.IsEmpty) return;
                 foreach ((DBusNode Node, string GeneratorMode) value in provider)
                 {
                     switch (value.GeneratorMode)
@@ -95,8 +89,11 @@ namespace Tmds.DBus.SourceGenerator
                             .WithMembers(
                                 List<MemberDeclarationSyntax>(_writeMethodExtensions.Values))));
 
+                productionContext.AddSource("Tmds.DBus.SourceGenerator.PropertyChanges.cs", MakePropertyChangesClass().GetText(Encoding.UTF8));
+                productionContext.AddSource("Tmds.DBus.SourceGenerator.SignalHelper.cs", MakeSignalHelperClass().GetText(Encoding.UTF8));
                 productionContext.AddSource("Tmds.DBus.SourceGenerator.ReaderExtensions.cs", readerExtensions.GetText(Encoding.UTF8));
                 productionContext.AddSource("Tmds.DBus.SourceGenerator.WriterExtensions.cs", writerExtensions.GetText(Encoding.UTF8));
+                productionContext.AddSource("Tmds.DBus.SourceGenerator.VariantExtensions.cs", VariantExtensions);
             });
         }
     }
