@@ -18,10 +18,10 @@ namespace Tmds.DBus.SourceGenerator
                 .AddUsings(
                     UsingDirective(IdentifierName("System")),
                     UsingDirective(IdentifierName("System.Collections.Generic")),
+                    UsingDirective(IdentifierName("System.Linq")),
                     UsingDirective(IdentifierName("System.Runtime.InteropServices")),
                     UsingDirective(IdentifierName("System.Threading.Tasks")),
-                    UsingDirective(IdentifierName("Tmds.DBus.Protocol")),
-                    UsingDirective(IdentifierName("Tmds.DBus.SourceGenerator")))
+                    UsingDirective(IdentifierName("Tmds.DBus.Protocol")))
                 .AddMembers(namespaceDeclaration
                     .WithLeadingTrivia(
                         TriviaList(
@@ -75,6 +75,96 @@ namespace Tmds.DBus.SourceGenerator
         private static LiteralExpressionSyntax MakeLiteralExpression(int literal) => LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(literal));
 
         private static string TupleOf(IEnumerable<string> elements) => $"({string.Join(", ", elements)})";
+
+        private static ExpressionSyntax MakeGetDBusVariantExpression(DBusValue dBusValue, ExpressionSyntax accessValueExpression) =>
+            dBusValue.DBusType switch
+            {
+                DBusType.Byte => InvocationExpression(
+                    ObjectCreationExpression(
+                        ParseTypeName("DBusByteItem")))
+                    .AddArgumentListArguments(Argument(accessValueExpression)),
+                DBusType.Bool => InvocationExpression(
+                    ObjectCreationExpression(
+                        ParseTypeName("DBusBoolItem")))
+                    .AddArgumentListArguments(Argument(accessValueExpression)),
+                DBusType.Int16 => InvocationExpression(
+                    ObjectCreationExpression(
+                        ParseTypeName("DBusInt16Item")))
+                    .AddArgumentListArguments(Argument(accessValueExpression)),
+                DBusType.UInt16 => InvocationExpression(
+                    ObjectCreationExpression(
+                        ParseTypeName("DBusUInt16Item")))
+                    .AddArgumentListArguments(Argument(accessValueExpression)),
+                DBusType.Int32 => InvocationExpression(
+                    ObjectCreationExpression(
+                        ParseTypeName("DBusInt32Item")))
+                    .AddArgumentListArguments(Argument(accessValueExpression)),
+                DBusType.UInt32 => InvocationExpression(
+                    ObjectCreationExpression(
+                        ParseTypeName("DBusUInt32Item")))
+                    .AddArgumentListArguments(Argument(accessValueExpression)),
+                DBusType.Int64 => InvocationExpression(
+                    ObjectCreationExpression(
+                        ParseTypeName("DBusInt64Item")))
+                    .AddArgumentListArguments(Argument(accessValueExpression)),
+                DBusType.UInt64 => InvocationExpression(
+                    ObjectCreationExpression(
+                        ParseTypeName("DBusUInt64Item")))
+                    .AddArgumentListArguments(Argument(accessValueExpression)),
+                DBusType.Double => InvocationExpression(
+                    ObjectCreationExpression(
+                        ParseTypeName("DBusDoubleItem"))).
+                    AddArgumentListArguments(Argument(accessValueExpression)),
+                DBusType.String => InvocationExpression(
+                    ObjectCreationExpression(
+                        ParseTypeName("DBusStringItem")))
+                    .AddArgumentListArguments(Argument(accessValueExpression)),
+                DBusType.ObjectPath => InvocationExpression(
+                    ObjectCreationExpression(
+                        ParseTypeName("DBusObjectPathItem")))
+                    .AddArgumentListArguments(Argument(accessValueExpression)),
+                DBusType.Signature => InvocationExpression(
+                    ObjectCreationExpression(
+                        ParseTypeName("DBusSignatureItem")))
+                    .AddArgumentListArguments(Argument(accessValueExpression)),
+                DBusType.Variant => InvocationExpression(
+                    ObjectCreationExpression(
+                        ParseTypeName("DBusVariantItem")))
+                    .AddArgumentListArguments(Argument(accessValueExpression)),
+                DBusType.Array => ObjectCreationExpression(
+                        ParseTypeName("DBusArrayItem"))
+                    .AddArgumentListArguments(
+                        Argument(MakeMemberAccessExpression("DBusType", Enum.GetName(typeof(DBusType), dBusValue.InnerDBusTypes![0].DBusType)!)),
+                        Argument(
+                            InvocationExpression(
+                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, accessValueExpression, IdentifierName("Select")))
+                                .AddArgumentListArguments(
+                                    Argument(
+                                        SimpleLambdaExpression(
+                                            Parameter(
+                                                Identifier("x")))
+                                            .WithExpressionBody(
+                                                MakeGetDBusVariantExpression(dBusValue.InnerDBusTypes![0], IdentifierName("x"))))))),
+                DBusType.DictEntry => InvocationExpression(
+                    ObjectCreationExpression(
+                        ParseTypeName("DBusDictEntryItem")))
+                    .AddArgumentListArguments(
+                        Argument(
+                            MakeGetDBusVariantExpression(dBusValue.InnerDBusTypes![0], MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, accessValueExpression, IdentifierName("Key")))),
+                        Argument(
+                            MakeGetDBusVariantExpression(dBusValue.InnerDBusTypes![1], MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, accessValueExpression, IdentifierName("Value"))))),
+                DBusType.Struct => InvocationExpression(
+                        ObjectCreationExpression(
+                            ParseTypeName("DBusStructItem")))
+                    .AddArgumentListArguments(
+                        Argument(
+                            ObjectCreationExpression(ParseTypeName("DBusItem[]"))
+                                .WithInitializer(
+                                    InitializerExpression(SyntaxKind.ArrayInitializerExpression, SeparatedList(
+                                        dBusValue.InnerDBusTypes!.Select((x, i) => 
+                                            MakeGetDBusVariantExpression(x, MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, accessValueExpression, IdentifierName($"Item{i + 1}"))))))))),
+                _ => throw new ArgumentOutOfRangeException(nameof(dBusValue.DBusType), dBusValue.DBusType, "")
+            };
 
         private string GetOrAddWriteMethod(DBusValue dBusValue) =>
             dBusValue.DBusType switch

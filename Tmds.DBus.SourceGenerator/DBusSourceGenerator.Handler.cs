@@ -307,12 +307,12 @@ namespace Tmds.DBus.SourceGenerator
                                                                         .AddArgumentListArguments(
                                                                             Argument(MakeLiteralExpression("a{sv}"))))))),
                                             LocalDeclarationStatement(
-                                                VariableDeclaration(ParseTypeName("Dictionary<string, object>"))
+                                                VariableDeclaration(ParseTypeName("Dictionary<string, DBusVariantItem>"))
                                                     .AddVariables(
                                                         VariableDeclarator("dict")
                                                             .WithInitializer(
                                                                 EqualsValueClause(
-                                                                    ObjectCreationExpression(ParseTypeName("Dictionary<string, object>"))
+                                                                    ObjectCreationExpression(ParseTypeName("Dictionary<string, DBusVariantItem>"))
                                                                         .WithInitializer(
                                                                             InitializerExpression(SyntaxKind.CollectionInitializerExpression)
                                                                                 .WithExpressions(
@@ -320,11 +320,17 @@ namespace Tmds.DBus.SourceGenerator
                                                                                         dBusInterface.Properties.Select(static dBusProperty =>
                                                                                             InitializerExpression(SyntaxKind.ComplexElementInitializerExpression)
                                                                                                 .AddExpressions(
-                                                                                                    MakeLiteralExpression(dBusProperty.Name!),
-                                                                                                    MakeMemberAccessExpression("BackingProperties", dBusProperty.Name!)))))))))),
+                                                                                                    MakeLiteralExpression(dBusProperty.Name!), InvocationExpression(
+                                                                                                        ObjectCreationExpression(
+                                                                                                            ParseTypeName("DBusVariantItem")))
+                                                                                                        .AddArgumentListArguments(
+                                                                                                            Argument(
+                                                                                                                MakeLiteralExpression(ParseSignature(new [] { dBusProperty })!)),
+                                                                                                            Argument(
+                                                                                                                MakeGetDBusVariantExpression(dBusProperty, MakeMemberAccessExpression("BackingProperties", dBusProperty.Name!))))))))))))),
                                             ExpressionStatement(
                                                 InvocationExpression(
-                                                        MakeMemberAccessExpression("writer", "WriteDictionary"))
+                                                        MakeMemberAccessExpression("writer", GetOrAddWriteMethod(new DBusValue { Type = "a{sv}"})))
                                                     .AddArgumentListArguments(
                                                         Argument(IdentifierName("dict")))),
                                             ExpressionStatement(
