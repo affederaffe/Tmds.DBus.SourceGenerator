@@ -22,7 +22,7 @@ namespace Tmds.DBus.SourceGenerator
                     MakeGetOnlyProperty(PredefinedType(Token(SyntaxKind.StringKeyword)), "Path", Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.AbstractKeyword)));
 
             MethodDeclarationSyntax handleMethod = MethodDeclaration(ParseTypeName("ValueTask"), "HandleMethodAsync")
-                .AddModifiers(Token(SyntaxKind.PublicKeyword))
+                .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.AsyncKeyword))
                 .AddParameterListParameters(
                     Parameter(Identifier("context"))
                         .WithType(ParseTypeName("MethodContext")));
@@ -52,7 +52,7 @@ namespace Tmds.DBus.SourceGenerator
                             LiteralExpression(SyntaxKind.TrueLiteralExpression)))
                     .WithSemicolonToken(Token(SyntaxKind.SemicolonToken)),
                 handleMethod.WithBody(
-                    Block(switchStatement, ReturnStatement(DefaultExpression(ParseTypeName("ValueTask"))))));
+                    Block(switchStatement)));
 
             return cl;
         }
@@ -78,11 +78,11 @@ namespace Tmds.DBus.SourceGenerator
 
                 BlockSyntax switchSectionBlock = Block();
 
-                string abstractMethodName = $"On{Pascalize(dBusMethod.Name!)}";
+                string abstractMethodName = $"On{Pascalize(dBusMethod.Name!)}Async";
 
                 MethodDeclarationSyntax abstractMethod = outArgs?.Length > 0
-                    ? MethodDeclaration(ParseTypeName(ParseReturnType(outArgs)!), abstractMethodName)
-                    : MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), abstractMethodName);
+                    ? MethodDeclaration(ParseTypeName($"ValueTask<{ParseReturnType(outArgs)!}>"), abstractMethodName)
+                    : MethodDeclaration(ParseTypeName("ValueTask"), abstractMethodName);
 
                 if (inArgs?.Length > 0)
                     abstractMethod = abstractMethod.WithParameterList(ParseParameterList(inArgs));
@@ -95,7 +95,7 @@ namespace Tmds.DBus.SourceGenerator
 
                 if (inArgs?.Length > 0)
                 {
-                    switchSectionBlock = switchSectionBlock.AddStatements(
+                    BlockSyntax readParametersMethodBlock = Block(
                         LocalDeclarationStatement(
                             VariableDeclaration(ParseTypeName("Reader"))
                                 .AddVariables(
@@ -104,27 +104,48 @@ namespace Tmds.DBus.SourceGenerator
                                             EqualsValueClause(
                                                 InvocationExpression(MakeMemberAccessExpression("context", "Request", "GetBodyReader")))))));
 
+                    SyntaxList<StatementSyntax> argFields = List<StatementSyntax>();
+
                     for (int i = 0; i < inArgs.Length; i++)
                     {
-                        switchSectionBlock = switchSectionBlock.AddStatements(
+                        string identifier = inArgs[i].Name is not null ? SanitizeIdentifier(inArgs[i].Name!) : $"arg{i}";
+                        readParametersMethodBlock = readParametersMethodBlock.AddStatements(
                             LocalDeclarationStatement(
                                 VariableDeclaration(ParseTypeName(inArgs[i].DotNetType))
                                     .AddVariables(
-                                        VariableDeclarator(inArgs[i].Name is not null ? SanitizeIdentifier(inArgs[i].Name!) : $"arg{i}")
+                                        VariableDeclarator(identifier)
                                             .WithInitializer(
                                                 EqualsValueClause(
                                                     InvocationExpression(
                                                         MakeMemberAccessExpression("reader", GetOrAddReadMethod(inArgs[i]))))))));
+                        argFields = argFields.Add(
+                            LocalDeclarationStatement(
+                                VariableDeclaration(ParseTypeName(inArgs[i].DotNetType))
+                                    .AddVariables(
+                                        VariableDeclarator(identifier)
+                                            .WithInitializer(
+                                                EqualsValueClause(
+                                                    PostfixUnaryExpression(SyntaxKind.SuppressNullableWarningExpression, LiteralExpression(SyntaxKind.DefaultLiteralExpression, Token(SyntaxKind.DefaultKeyword))))))));
                     }
+
+                    switchSectionBlock = switchSectionBlock.AddStatements(argFields.ToArray());
+                    switchSectionBlock = switchSectionBlock.AddStatements(
+                        ExpressionStatement(
+                            InvocationExpression(
+                                IdentifierName("ReadParameters"))),
+                        LocalFunctionStatement(
+                                PredefinedType(Token(SyntaxKind.VoidKeyword)), Identifier("ReadParameters"))
+                            .WithBody(readParametersMethodBlock));
 
                     if (outArgs is null || outArgs.Length == 0)
                         switchSectionBlock = switchSectionBlock.AddStatements(
                             ExpressionStatement(
-                                InvocationExpression(
-                                        IdentifierName(abstractMethodName))
-                                    .AddArgumentListArguments(
-                                        inArgs.Select(static (x, i) =>
-                                            Argument(IdentifierName(x.Name is not null ? SanitizeIdentifier(x.Name) : $"arg{i}"))).ToArray())));
+                                AwaitExpression(
+                                    InvocationExpression(
+                                            IdentifierName(abstractMethodName))
+                                        .AddArgumentListArguments(
+                                            inArgs.Select(static (x, i) =>
+                                                Argument(IdentifierName(x.Name is not null ? SanitizeIdentifier(x.Name) : $"arg{i}"))).ToArray()))));
                 }
 
                 if (outArgs?.Length > 0)
@@ -137,13 +158,17 @@ namespace Tmds.DBus.SourceGenerator
                                         .WithInitializer(
                                             EqualsValueClause(
                                                 inArgs?.Length > 0
-                                                    ? InvocationExpression(
-                                                            IdentifierName(abstractMethodName))
-                                                        .AddArgumentListArguments(
-                                                            inArgs.Select(static (x, i) =>
-                                                                Argument(IdentifierName(x.Name is not null ? SanitizeIdentifier(x.Name) : $"arg{i}"))).ToArray())
-                                                    : InvocationExpression(
-                                                        IdentifierName(abstractMethodName)))))),
+                                                    ? AwaitExpression(
+                                                        InvocationExpression(
+                                                                IdentifierName(abstractMethodName))
+                                                            .AddArgumentListArguments(
+                                                                inArgs.Select(static (x, i) =>
+                                                                    Argument(IdentifierName(x.Name is not null ? SanitizeIdentifier(x.Name) : $"arg{i}"))).ToArray()))
+                                                    : AwaitExpression(
+                                                        InvocationExpression(
+                                                            IdentifierName(abstractMethodName))))))));
+
+                    BlockSyntax replyMethodBlock = Block(
                         LocalDeclarationStatement(
                                 VariableDeclaration(ParseTypeName("MessageWriter"))
                                     .AddVariables(
@@ -157,7 +182,7 @@ namespace Tmds.DBus.SourceGenerator
 
                     if (outArgs.Length == 1)
                     {
-                        switchSectionBlock = switchSectionBlock.AddStatements(
+                        replyMethodBlock = replyMethodBlock.AddStatements(
                             ExpressionStatement(
                                 InvocationExpression(
                                         MakeMemberAccessExpression("writer", GetOrAddWriteMethod(outArgs[0])))
@@ -169,7 +194,7 @@ namespace Tmds.DBus.SourceGenerator
                     {
                         for (int i = 0; i < outArgs.Length; i++)
                         {
-                            switchSectionBlock = switchSectionBlock.AddStatements(
+                            replyMethodBlock = replyMethodBlock.AddStatements(
                                 ExpressionStatement(
                                     InvocationExpression(
                                             MakeMemberAccessExpression("writer", GetOrAddWriteMethod(outArgs[i])))
@@ -179,7 +204,7 @@ namespace Tmds.DBus.SourceGenerator
                         }
                     }
 
-                    switchSectionBlock = switchSectionBlock.AddStatements(
+                    replyMethodBlock = replyMethodBlock.AddStatements(
                         ExpressionStatement(
                             InvocationExpression(
                                     MakeMemberAccessExpression("context", "Reply"))
@@ -190,6 +215,14 @@ namespace Tmds.DBus.SourceGenerator
                         ExpressionStatement(
                             InvocationExpression(
                                 MakeMemberAccessExpression("writer", "Dispose"))));
+
+                    switchSectionBlock = switchSectionBlock.AddStatements(
+                        ExpressionStatement(
+                            InvocationExpression(
+                                IdentifierName("Reply"))),
+                        LocalFunctionStatement(
+                                PredefinedType(Token(SyntaxKind.VoidKeyword)), Identifier("Reply"))
+                            .WithBody(replyMethodBlock));
                 }
 
                 switchSectionBlock = switchSectionBlock.AddStatements(BreakStatement());
@@ -269,7 +302,7 @@ namespace Tmds.DBus.SourceGenerator
                         SwitchStatement(
                                 TupleExpression()
                                     .AddArguments(
-                                        Argument(MakeMemberAccessExpression("context", "Request", "MemberAsString")),
+                                        Argument(MakeMemberAccessExpression("context", "Request", "MemberAsString")), 
                                         Argument(MakeMemberAccessExpression("context", "Request", "SignatureAsString"))))
                             .AddSections(
                                 SwitchSection()
@@ -280,60 +313,71 @@ namespace Tmds.DBus.SourceGenerator
                                                     Argument(MakeLiteralExpression("Get")),
                                                     Argument(MakeLiteralExpression("ss")))))
                                     .AddStatements(
-                                        LocalDeclarationStatement(
-                                            VariableDeclaration(ParseTypeName("Reader"))
-                                                .AddVariables(
-                                                    VariableDeclarator("reader")
-                                                        .WithInitializer(
-                                                            EqualsValueClause(
-                                                                InvocationExpression(
-                                                                    MakeMemberAccessExpression("context", "Request", "GetBodyReader")))))),
-                                        ExpressionStatement(
-                                            InvocationExpression(
-                                                MakeMemberAccessExpression("reader", "ReadString"))),
-                                        LocalDeclarationStatement(
-                                            VariableDeclaration(PredefinedType(Token(SyntaxKind.StringKeyword)))
-                                                .AddVariables(
-                                                    VariableDeclarator("member")
-                                                        .WithInitializer(
-                                                            EqualsValueClause(
-                                                                InvocationExpression(
-                                                                    MakeMemberAccessExpression("reader", "ReadString")))))),
-                                        SwitchStatement(IdentifierName("member"))
-                                            .WithSections(
-                                                List(
-                                                    dBusInterface.Properties.Select(dBusProperty =>
-                                                        SwitchSection()
-                                                            .AddLabels(
-                                                                CaseSwitchLabel(MakeLiteralExpression(dBusProperty.Name!)))
-                                                            .AddStatements(
-                                                                Block(
-                                                                    LocalDeclarationStatement(
-                                                                            VariableDeclaration(ParseTypeName("MessageWriter"))
-                                                                                .AddVariables(
-                                                                                    VariableDeclarator("writer")
-                                                                                        .WithInitializer(
-                                                                                            EqualsValueClause(
-                                                                                                InvocationExpression(
-                                                                                                        MakeMemberAccessExpression("context", "CreateReplyWriter"))
-                                                                                                    .AddArgumentListArguments(
-                                                                                                        Argument(MakeLiteralExpression(dBusProperty.Type!))))))),
-                                                                    ExpressionStatement(
-                                                                        InvocationExpression(
-                                                                                MakeMemberAccessExpression("writer", GetOrAddWriteMethod(dBusProperty)))
-                                                                            .AddArgumentListArguments(
-                                                                                Argument(MakeMemberAccessExpression("BackingProperties", dBusProperty.Name!)))),
-                                                                    ExpressionStatement(
-                                                                        InvocationExpression(
-                                                                                MakeMemberAccessExpression("context", "Reply"))
-                                                                            .AddArgumentListArguments(
-                                                                                Argument(
-                                                                                    InvocationExpression(MakeMemberAccessExpression("writer", "CreateMessage"))))),
-                                                                    ExpressionStatement(
-                                                                        InvocationExpression(
-                                                                            MakeMemberAccessExpression("writer", "Dispose"))),
-                                                                    BreakStatement()))))),
-                                        BreakStatement()),
+                                        Block(
+                                            ExpressionStatement(
+                                                InvocationExpression(IdentifierName("Reply"))),
+                                            LocalFunctionStatement(PredefinedType(Token(SyntaxKind.VoidKeyword)), Identifier("Reply"))
+                                                .AddBodyStatements(
+                                                    LocalDeclarationStatement(
+                                                        VariableDeclaration(ParseTypeName("Reader"))
+                                                            .AddVariables(
+                                                                VariableDeclarator("reader")
+                                                                    .WithInitializer(
+                                                                        EqualsValueClause(
+                                                                            InvocationExpression(
+                                                                                MakeMemberAccessExpression("context", "Request",
+                                                                                    "GetBodyReader")))))),
+                                                    ExpressionStatement(
+                                                        InvocationExpression(
+                                                            MakeMemberAccessExpression("reader", "ReadString"))),
+                                                    LocalDeclarationStatement(
+                                                        VariableDeclaration(PredefinedType(Token(SyntaxKind.StringKeyword)))
+                                                            .AddVariables(
+                                                                VariableDeclarator("member")
+                                                                    .WithInitializer(
+                                                                        EqualsValueClause(
+                                                                            InvocationExpression(
+                                                                                MakeMemberAccessExpression("reader", "ReadString")))))),
+                                                    SwitchStatement(IdentifierName("member"))
+                                                        .WithSections(
+                                                            List(
+                                                                dBusInterface.Properties.Select(dBusProperty => 
+                                                                    SwitchSection()
+                                                                        .AddLabels(
+                                                                            CaseSwitchLabel(
+                                                                                MakeLiteralExpression(dBusProperty.Name!)))
+                                                                        .AddStatements(
+                                                                            Block(
+                                                                                LocalDeclarationStatement(
+                                                                                    VariableDeclaration(ParseTypeName("MessageWriter"))
+                                                                                        .AddVariables(
+                                                                                            VariableDeclarator("writer")
+                                                                                                .WithInitializer(
+                                                                                                    EqualsValueClause(
+                                                                                                        InvocationExpression(
+                                                                                                                MakeMemberAccessExpression("context",
+                                                                                                                    "CreateReplyWriter"))
+                                                                                                            .AddArgumentListArguments(
+                                                                                                                Argument(
+                                                                                                                    MakeLiteralExpression(dBusProperty.Type!))))))),
+                                                                                ExpressionStatement(
+                                                                                    InvocationExpression(
+                                                                                            MakeMemberAccessExpression("writer",
+                                                                                                GetOrAddWriteMethod(dBusProperty)))
+                                                                                        .AddArgumentListArguments(
+                                                                                            Argument(MakeMemberAccessExpression("BackingProperties",
+                                                                                                dBusProperty.Name!)))),
+                                                                                ExpressionStatement(
+                                                                                    InvocationExpression(
+                                                                                            MakeMemberAccessExpression("context", "Reply"))
+                                                                                        .AddArgumentListArguments(
+                                                                                            Argument(
+                                                                                                InvocationExpression(MakeMemberAccessExpression("writer", "CreateMessage"))))),
+                                                                                ExpressionStatement(
+                                                                                    InvocationExpression(
+                                                                                        MakeMemberAccessExpression("writer", "Dispose"))),
+                                                                                BreakStatement())))))),
+                                            BreakStatement())),
                                 SwitchSection()
                                     .AddLabels(
                                         CaseSwitchLabel(
@@ -343,36 +387,41 @@ namespace Tmds.DBus.SourceGenerator
                                                     Argument(MakeLiteralExpression("s")))))
                                     .AddStatements(
                                         Block(
-                                            LocalDeclarationStatement(
-                                                VariableDeclaration(ParseTypeName("MessageWriter"))
-                                                    .AddVariables(
-                                                        VariableDeclarator("writer")
-                                                            .WithInitializer(
-                                                                EqualsValueClause(
-                                                                    InvocationExpression(
-                                                                            MakeMemberAccessExpression("context", "CreateReplyWriter"))
-                                                                        .AddArgumentListArguments(
-                                                                            Argument(MakeLiteralExpression("a{sv}"))))))),
-                                            LocalDeclarationStatement(
-                                                VariableDeclaration(ParseTypeName("Dictionary<string, DBusVariantItem>"))
-                                                    .AddVariables(
-                                                        VariableDeclarator("dict")
-                                                            .WithInitializer(
-                                                                EqualsValueClause(
-                                                                    InvocationExpression(
-                                                                        ObjectCreationExpression(ParseTypeName("Dictionary<string, DBusVariantItem>"))))))),
-                                            Block(addPropertiesStatements),
                                             ExpressionStatement(
-                                                InvocationExpression(
-                                                        MakeMemberAccessExpression("writer", GetOrAddWriteMethod(new DBusValue { Type = "a{sv}"})))
-                                                    .AddArgumentListArguments(
-                                                        Argument(IdentifierName("dict")))),
-                                            ExpressionStatement(
-                                                InvocationExpression(
-                                                        MakeMemberAccessExpression("context", "Reply"))
-                                                    .AddArgumentListArguments(
-                                                        Argument(
-                                                            InvocationExpression(MakeMemberAccessExpression("writer", "CreateMessage"))))),
+                                                InvocationExpression(IdentifierName("Reply"))),
+                                            LocalFunctionStatement(PredefinedType(Token(SyntaxKind.VoidKeyword)), Identifier("Reply"))
+                                                .AddBodyStatements(
+                                                    LocalDeclarationStatement(
+                                                        VariableDeclaration(ParseTypeName("MessageWriter"))
+                                                            .AddVariables(
+                                                                VariableDeclarator("writer")
+                                                                    .WithInitializer(
+                                                                        EqualsValueClause(
+                                                                            InvocationExpression(
+                                                                                    MakeMemberAccessExpression("context", "CreateReplyWriter"))
+                                                                                .AddArgumentListArguments(
+                                                                                    Argument(MakeLiteralExpression("a{sv}"))))))),
+                                                    LocalDeclarationStatement(
+                                                        VariableDeclaration(ParseTypeName("Dictionary<string, DBusVariantItem>"))
+                                                            .AddVariables(
+                                                                VariableDeclarator("dict")
+                                                                    .WithInitializer(
+                                                                        EqualsValueClause(
+                                                                            InvocationExpression(
+                                                                                ObjectCreationExpression(
+                                                                                    ParseTypeName("Dictionary<string, DBusVariantItem>"))))))),
+                                                    Block(addPropertiesStatements),
+                                                    ExpressionStatement(
+                                                        InvocationExpression(
+                                                                MakeMemberAccessExpression("writer", GetOrAddWriteMethod(new DBusValue { Type = "a{sv}" })))
+                                                            .AddArgumentListArguments(
+                                                                Argument(IdentifierName("dict")))),
+                                                    ExpressionStatement(
+                                                        InvocationExpression(
+                                                                MakeMemberAccessExpression("context", "Reply"))
+                                                            .AddArgumentListArguments(
+                                                                Argument(
+                                                                    InvocationExpression(MakeMemberAccessExpression("writer", "CreateMessage")))))),
                                             BreakStatement()))),
                         BreakStatement()));
 
