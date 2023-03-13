@@ -20,7 +20,7 @@
         <PackageId>Tmds.DBus.SourceGenerator</PackageId>
         <Authors>affederaffe</Authors>
         <Copyright>affederaffe</Copyright>
-        <Description>A roslyn source generator for creating proxies targeting the Tmds.DBus.Protocol API</Description>
+        <Description>A roslyn source generator for creating proxies and abstract handlers targeting the Tmds.DBus.Protocol API</Description>
         <PackageTags>DBus;SourceGenerator</PackageTags>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageProjectUrl>https://github.com/affederaffe/Tmds.DBus.SourceGenerator</PackageProjectUrl>
