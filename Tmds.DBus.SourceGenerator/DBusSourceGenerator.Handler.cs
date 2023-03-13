@@ -110,22 +110,14 @@ namespace Tmds.DBus.SourceGenerator
                     {
                         string identifier = inArgs[i].Name is not null ? SanitizeIdentifier(inArgs[i].Name!) : $"arg{i}";
                         readParametersMethodBlock = readParametersMethodBlock.AddStatements(
-                            LocalDeclarationStatement(
-                                VariableDeclaration(ParseTypeName(inArgs[i].DotNetType))
-                                    .AddVariables(
-                                        VariableDeclarator(identifier)
-                                            .WithInitializer(
-                                                EqualsValueClause(
-                                                    InvocationExpression(
-                                                        MakeMemberAccessExpression("reader", GetOrAddReadMethod(inArgs[i]))))))));
+                            ExpressionStatement(
+                                AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(identifier), InvocationExpression(
+                                    MakeMemberAccessExpression("reader", GetOrAddReadMethod(inArgs[i]))))));
                         argFields = argFields.Add(
                             LocalDeclarationStatement(
                                 VariableDeclaration(ParseTypeName(inArgs[i].DotNetType))
                                     .AddVariables(
-                                        VariableDeclarator(identifier)
-                                            .WithInitializer(
-                                                EqualsValueClause(
-                                                    PostfixUnaryExpression(SyntaxKind.SuppressNullableWarningExpression, LiteralExpression(SyntaxKind.DefaultLiteralExpression, Token(SyntaxKind.DefaultKeyword))))))));
+                                        VariableDeclarator(identifier))));
                     }
 
                     switchSectionBlock = switchSectionBlock.AddStatements(argFields.ToArray());
