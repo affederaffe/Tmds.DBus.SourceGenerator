@@ -162,7 +162,7 @@ namespace Tmds.DBus.SourceGenerator
                             ObjectCreationExpression(ParseTypeName("DBusItem[]"))
                                 .WithInitializer(
                                     InitializerExpression(SyntaxKind.ArrayInitializerExpression, SeparatedList(
-                                        dBusValue.InnerDBusTypes!.Select((x, i) => 
+                                        dBusValue.InnerDBusTypes!.Select((x, i) =>
                                             MakeGetDBusVariantExpression(x, MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, accessValueExpression, IdentifierName($"Item{i + 1}"))))))))),
                 _ => throw new ArgumentOutOfRangeException(nameof(dBusValue.DBusType), dBusValue.DBusType, "")
             };
