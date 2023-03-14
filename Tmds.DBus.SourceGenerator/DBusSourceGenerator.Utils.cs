@@ -20,6 +20,7 @@ namespace Tmds.DBus.SourceGenerator
                     UsingDirective(IdentifierName("System.Collections.Generic")),
                     UsingDirective(IdentifierName("System.Linq")),
                     UsingDirective(IdentifierName("System.Runtime.InteropServices")),
+                    UsingDirective(IdentifierName("System.Threading")),
                     UsingDirective(IdentifierName("System.Threading.Tasks")),
                     UsingDirective(IdentifierName("Tmds.DBus.Protocol")))
                 .AddMembers(namespaceDeclaration

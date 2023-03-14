@@ -1,4 +1,7 @@
+using System;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -18,6 +21,26 @@ namespace Tmds.DBus.SourceGenerator
                 .AddBaseListTypes(
                     SimpleBaseType(ParseTypeName("IMethodHandler")))
                 .AddMembers(
+                    FieldDeclaration(
+                            VariableDeclaration(NullableType(ParseTypeName("SynchronizationContext")))
+                                .AddVariables(
+                                    VariableDeclarator("_synchronizationContext")))
+                        .AddModifiers(Token(SyntaxKind.PrivateKeyword)),
+                    ConstructorDeclaration(Pascalize(dBusInterface.Name!))
+                        .AddModifiers(Token(SyntaxKind.PublicKeyword))
+                        .AddParameterListParameters(
+                            Parameter(Identifier("emitOnCapturedContext"))
+                                .WithType(PredefinedType(Token(SyntaxKind.BoolKeyword)))
+                                .WithDefault(
+                                    EqualsValueClause(
+                                        LiteralExpression(SyntaxKind.TrueLiteralExpression))))
+                        .WithBody(
+                            Block(
+                                IfStatement(
+                                    IdentifierName("emitOnCapturedContext"),
+                                    ExpressionStatement(
+                                        AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName("_synchronizationContext"),
+                                            MakeMemberAccessExpression("SynchronizationContext", "Current")))))),
                     MakeGetOnlyProperty(ParseTypeName("Connection"), "Connection", Token(SyntaxKind.ProtectedKeyword), Token(SyntaxKind.AbstractKeyword)),
                     MakeGetOnlyProperty(PredefinedType(Token(SyntaxKind.StringKeyword)), "Path", Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.AbstractKeyword)));
 
@@ -130,14 +153,60 @@ namespace Tmds.DBus.SourceGenerator
                             .WithBody(readParametersMethodBlock));
 
                     if (outArgs is null || outArgs.Length == 0)
+                    {
                         switchSectionBlock = switchSectionBlock.AddStatements(
+                            IfStatement(
+                        IsPatternExpression(
+                            IdentifierName("_synchronizationContext"), UnaryPattern(ConstantPattern(LiteralExpression(SyntaxKind.NullLiteralExpression)))),
+                        Block(
+                            LocalDeclarationStatement(
+                                VariableDeclaration(ParseTypeName($"TaskCompletionSource<bool>"))
+                                    .AddVariables(
+                                        VariableDeclarator("tsc")
+                                            .WithInitializer(
+                                                EqualsValueClause(
+                                                    ImplicitObjectCreationExpression())))),
+                            ExpressionStatement(
+                                InvocationExpression(
+                                    MakeMemberAccessExpression("_synchronizationContext", "Post"))
+                                    .AddArgumentListArguments(
+                                        Argument(
+                                            SimpleLambdaExpression(
+                                                Parameter(
+                                                    Identifier("_")))
+                                                .WithAsyncKeyword(Token(SyntaxKind.AsyncKeyword))
+                                                .WithBlock(
+                                                    Block(
+                                                        ExpressionStatement(
+                                                            AwaitExpression(
+                                                                InvocationExpression(
+                                                                        IdentifierName(abstractMethodName))
+                                                                    .AddArgumentListArguments(
+                                                                        inArgs.Select(static (x, i) =>
+                                                                            Argument(
+                                                                                IdentifierName(x.Name is not null ? SanitizeIdentifier(x.Name) : $"arg{i}"))).ToArray()))),
+                                                        ExpressionStatement(
+                                                            InvocationExpression(
+                                                                MakeMemberAccessExpression("tsc", "SetResult"))
+                                                                .AddArgumentListArguments(
+                                                                    Argument(
+                                                                        LiteralExpression(SyntaxKind.TrueLiteralExpression))))))),
+                                        Argument(
+                                            LiteralExpression(SyntaxKind.NullLiteralExpression)))),
+                            ExpressionStatement(
+                                AwaitExpression(
+                                    MakeMemberAccessExpression("tsc", "Task")))),
+                        ElseClause(
+                            Block(
                             ExpressionStatement(
                                 AwaitExpression(
                                     InvocationExpression(
                                             IdentifierName(abstractMethodName))
                                         .AddArgumentListArguments(
                                             inArgs.Select(static (x, i) =>
-                                                Argument(IdentifierName(x.Name is not null ? SanitizeIdentifier(x.Name) : $"arg{i}"))).ToArray()))));
+                                                Argument(
+                                                    IdentifierName(x.Name is not null ? SanitizeIdentifier(x.Name) : $"arg{i}"))).ToArray())))))));
+                    }
                 }
 
                 if (outArgs?.Length > 0)
@@ -146,19 +215,63 @@ namespace Tmds.DBus.SourceGenerator
                         LocalDeclarationStatement(
                             VariableDeclaration(ParseTypeName(ParseReturnType(outArgs)!))
                                 .AddVariables(
-                                    VariableDeclarator("ret")
-                                        .WithInitializer(
-                                            EqualsValueClause(
-                                                inArgs?.Length > 0
-                                                    ? AwaitExpression(
-                                                        InvocationExpression(
-                                                                IdentifierName(abstractMethodName))
-                                                            .AddArgumentListArguments(
-                                                                inArgs.Select(static (x, i) =>
-                                                                    Argument(IdentifierName(x.Name is not null ? SanitizeIdentifier(x.Name) : $"arg{i}"))).ToArray()))
-                                                    : AwaitExpression(
-                                                        InvocationExpression(
-                                                            IdentifierName(abstractMethodName))))))));
+                                    VariableDeclarator("ret"))),
+                        IfStatement(
+                        IsPatternExpression(
+                            IdentifierName("_synchronizationContext"), UnaryPattern(ConstantPattern(LiteralExpression(SyntaxKind.NullLiteralExpression)))),
+                        Block(
+                            LocalDeclarationStatement(
+                                VariableDeclaration(ParseTypeName($"TaskCompletionSource<{ParseReturnType(outArgs)!}>"))
+                                    .AddVariables(
+                                        VariableDeclarator("tsc")
+                                            .WithInitializer(
+                                                EqualsValueClause(
+                                                    ImplicitObjectCreationExpression())))),
+                            ExpressionStatement(
+                                InvocationExpression(
+                                    MakeMemberAccessExpression("_synchronizationContext", "Post"))
+                                    .AddArgumentListArguments(
+                                        Argument(
+                                            SimpleLambdaExpression(
+                                                Parameter(
+                                                    Identifier("_")))
+                                                .WithAsyncKeyword(Token(SyntaxKind.AsyncKeyword))
+                                                .WithBlock(
+                                                    Block(
+                                                        LocalDeclarationStatement(
+                                                            VariableDeclaration(
+                                                                ParseTypeName(ParseReturnType(outArgs)!))
+                                                                .AddVariables(
+                                                                    VariableDeclarator("ret1")
+                                                                        .WithInitializer(
+                                                                            EqualsValueClause(
+                                                                                AwaitExpression(
+                                                                                    InvocationExpression(
+                                                                                            IdentifierName(abstractMethodName))
+                                                                                        .AddArgumentListArguments(
+                                                                                            inArgs?.Select(static (x, i) =>
+                                                                                                Argument(
+                                                                                                    IdentifierName(x.Name is not null ? SanitizeIdentifier(x.Name) : $"arg{i}"))).ToArray() ?? Array.Empty<ArgumentSyntax>())))))),
+                                                        ExpressionStatement(
+                                                            InvocationExpression(
+                                                                MakeMemberAccessExpression("tsc", "SetResult"))
+                                                                .AddArgumentListArguments(
+                                                                    Argument(IdentifierName("ret1"))))))),
+                                        Argument(
+                                            LiteralExpression(SyntaxKind.NullLiteralExpression)))),
+                            ExpressionStatement(
+                                MakeAssignmentExpression(IdentifierName("ret"), AwaitExpression(
+                                    MakeMemberAccessExpression("tsc", "Task"))))),
+                        ElseClause(
+                            Block(
+                            ExpressionStatement(
+                                MakeAssignmentExpression(IdentifierName("ret"), AwaitExpression(
+                                    InvocationExpression(
+                                            IdentifierName(abstractMethodName))
+                                        .AddArgumentListArguments(
+                                            inArgs?.Select(static (x, i) =>
+                                                Argument(
+                                                    IdentifierName(x.Name is not null ? SanitizeIdentifier(x.Name) : $"arg{i}"))).ToArray() ?? Array.Empty<ArgumentSyntax>()))))))));
 
                     BlockSyntax replyMethodBlock = Block(
                         LocalDeclarationStatement(
