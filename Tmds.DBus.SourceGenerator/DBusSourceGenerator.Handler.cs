@@ -376,52 +376,6 @@ namespace Tmds.DBus.SourceGenerator
         {
             if (dBusInterface.Properties is null) return;
 
-            SyntaxList<StatementSyntax> addPropertiesStatements = List<StatementSyntax>();
-            foreach (DBusProperty dBusProperty in dBusInterface.Properties)
-            {
-                if (dBusProperty.DBusType is DBusType.Bool or DBusType.Byte or DBusType.Double or DBusType.Int16 or DBusType.UInt16 or DBusType.Int32 or DBusType.UInt32 or DBusType.Int64 or DBusType.UInt64 or DBusType.Signature or DBusType.ObjectPath or DBusType.Struct)
-                    addPropertiesStatements = addPropertiesStatements.Add(
-                        ExpressionStatement(
-                            InvocationExpression(
-                                    MakeMemberAccessExpression("dict", "Add"))
-                                .AddArgumentListArguments(
-                                    Argument(
-                                        MakeLiteralExpression(dBusProperty.Name!)),
-                                    Argument(
-                                        InvocationExpression(
-                                                ObjectCreationExpression(
-                                                    ParseTypeName("DBusVariantItem")))
-                                            .AddArgumentListArguments(
-                                                Argument(
-                                                    MakeLiteralExpression(ParseSignature(new[] { dBusProperty })!)),
-                                                Argument(
-                                                    MakeGetDBusVariantExpression(dBusProperty,
-                                                        MakeMemberAccessExpression("BackingProperties", dBusProperty.Name!))))))));
-                else
-                    addPropertiesStatements = addPropertiesStatements.Add(
-                        IfStatement(
-                            IsPatternExpression(
-                                MakeMemberAccessExpression("BackingProperties", dBusProperty.Name!), UnaryPattern(
-                                    ConstantPattern(
-                                        LiteralExpression(SyntaxKind.NullLiteralExpression)))),
-                            ExpressionStatement(
-                                InvocationExpression(
-                                        MakeMemberAccessExpression("dict", "Add"))
-                                    .AddArgumentListArguments(
-                                        Argument(
-                                            MakeLiteralExpression(dBusProperty.Name!)),
-                                        Argument(
-                                            InvocationExpression(
-                                                    ObjectCreationExpression(
-                                                        ParseTypeName("DBusVariantItem")))
-                                                .AddArgumentListArguments(
-                                                    Argument(
-                                                        MakeLiteralExpression(ParseSignature(new[] { dBusProperty })!)),
-                                                    Argument(
-                                                        MakeGetDBusVariantExpression(dBusProperty,
-                                                            MakeMemberAccessExpression("BackingProperties", dBusProperty.Name!)))))))));
-            }
-
             sw = sw.AddSections(
                 SwitchSection()
                     .AddLabels(
@@ -541,11 +495,23 @@ namespace Tmds.DBus.SourceGenerator
                                                             .AddVariables(
                                                                 VariableDeclarator("dict")
                                                                     .WithInitializer(
-                                                                        EqualsValueClause(
-                                                                            InvocationExpression(
-                                                                                ObjectCreationExpression(
-                                                                                    ParseTypeName("Dictionary<string, DBusVariantItem>"))))))),
-                                                    Block(addPropertiesStatements),
+                                                                EqualsValueClause(
+                                                                    ObjectCreationExpression(ParseTypeName("Dictionary<string, DBusVariantItem>"))
+                                                                        .WithInitializer(
+                                                                            InitializerExpression(SyntaxKind.CollectionInitializerExpression)
+                                                                                .WithExpressions(
+                                                                                    SeparatedList<ExpressionSyntax>(
+                                                                                        dBusInterface.Properties.Select(static dBusProperty =>
+                                                                                            InitializerExpression(SyntaxKind.ComplexElementInitializerExpression)
+                                                                                                .AddExpressions(
+                                                                                                    MakeLiteralExpression(dBusProperty.Name!), InvocationExpression(
+                                                                                                        ObjectCreationExpression(
+                                                                                                            ParseTypeName("DBusVariantItem")))
+                                                                                                        .AddArgumentListArguments(
+                                                                                                            Argument(
+                                                                                                                MakeLiteralExpression(ParseSignature(new [] { dBusProperty })!)),
+                                                                                                            Argument(
+                                                                                                                MakeGetDBusVariantExpression(dBusProperty, MakeMemberAccessExpression("BackingProperties", dBusProperty.Name!))))))))))))),
                                                     ExpressionStatement(
                                                         InvocationExpression(
                                                                 MakeMemberAccessExpression("writer", GetOrAddWriteMethod(new DBusValue { Type = "a{sv}" })))
