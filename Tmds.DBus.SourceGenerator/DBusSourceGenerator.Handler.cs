@@ -469,7 +469,7 @@ namespace Tmds.DBus.SourceGenerator
                                                     SwitchStatement(IdentifierName("member"))
                                                         .WithSections(
                                                             List(
-                                                                dBusInterface.Properties.Select(dBusProperty =>
+                                                                dBusInterface.Properties.Select(static dBusProperty =>
                                                                     SwitchSection()
                                                                         .AddLabels(
                                                                             CaseSwitchLabel(
@@ -483,24 +483,31 @@ namespace Tmds.DBus.SourceGenerator
                                                                                                 .WithInitializer(
                                                                                                     EqualsValueClause(
                                                                                                         InvocationExpression(
-                                                                                                                MakeMemberAccessExpression("context",
-                                                                                                                    "CreateReplyWriter"))
+                                                                                                                MakeMemberAccessExpression("context", "CreateReplyWriter"))
                                                                                                             .AddArgumentListArguments(
                                                                                                                 Argument(
-                                                                                                                    MakeLiteralExpression(dBusProperty.Type!))))))),
+                                                                                                                    MakeLiteralExpression("v"))))))),
                                                                                 ExpressionStatement(
                                                                                     InvocationExpression(
-                                                                                            MakeMemberAccessExpression("writer",
-                                                                                                GetOrAddWriteMethod(dBusProperty)))
+                                                                                            MakeMemberAccessExpression("writer", "WriteDBusVariant"))
                                                                                         .AddArgumentListArguments(
-                                                                                            Argument(MakeMemberAccessExpression("BackingProperties",
-                                                                                                dBusProperty.Name!)))),
+                                                                                            Argument(
+                                                                                                InvocationExpression(
+                                                                                                        ObjectCreationExpression(
+                                                                                                            ParseTypeName("DBusVariantItem")))
+                                                                                                    .AddArgumentListArguments(
+                                                                                                        Argument(
+                                                                                                            MakeLiteralExpression(ParseSignature(new[] { dBusProperty })!)),
+                                                                                                        Argument(
+                                                                                                            MakeGetDBusVariantExpression(dBusProperty,
+                                                                                                                MakeMemberAccessExpression("BackingProperties", dBusProperty.Name!))))))),
                                                                                 ExpressionStatement(
                                                                                     InvocationExpression(
                                                                                             MakeMemberAccessExpression("context", "Reply"))
                                                                                         .AddArgumentListArguments(
                                                                                             Argument(
-                                                                                                InvocationExpression(MakeMemberAccessExpression("writer", "CreateMessage"))))),
+                                                                                                InvocationExpression(
+                                                                                                    MakeMemberAccessExpression("writer", "CreateMessage"))))),
                                                                                 ExpressionStatement(
                                                                                     InvocationExpression(
                                                                                         MakeMemberAccessExpression("writer", "Dispose"))),
