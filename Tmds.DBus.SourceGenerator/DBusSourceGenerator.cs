@@ -78,14 +78,14 @@ namespace Tmds.DBus.SourceGenerator
                 CompilationUnitSyntax readerExtensions = MakeCompilationUnit(NamespaceDeclaration(IdentifierName("Tmds.DBus.SourceGenerator"))
                     .AddMembers(
                         ClassDeclaration("ReaderExtensions")
-                            .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
+                            .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.StaticKeyword))
                             .WithMembers(
                                 List<MemberDeclarationSyntax>(_readMethodExtensions.Values))));
 
                 CompilationUnitSyntax writerExtensions = MakeCompilationUnit(NamespaceDeclaration(IdentifierName("Tmds.DBus.SourceGenerator"))
                     .AddMembers(
                         ClassDeclaration("WriterExtensions")
-                            .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
+                            .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.StaticKeyword))
                             .WithMembers(
                                 List<MemberDeclarationSyntax>(_writeMethodExtensions.Values))));
 

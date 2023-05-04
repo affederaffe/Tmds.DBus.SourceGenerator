@@ -56,8 +56,7 @@ namespace Tmds.DBus.SourceGenerator
                 .AddAccessorListAccessors(
                     AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
                         .WithSemicolonToken(Token(SyntaxKind.SemicolonToken)),
-                    AccessorDeclaration(SyntaxKind.SetAccessorDeclaration).WithSemicolonToken(Token(SyntaxKind.SemicolonToken)
-                        ));
+                    AccessorDeclaration(SyntaxKind.SetAccessorDeclaration).WithSemicolonToken(Token(SyntaxKind.SemicolonToken)));
 
         private static ExpressionStatementSyntax MakeAssignmentExpressionStatement(string left, string right) =>
             ExpressionStatement(MakeAssignmentExpression(IdentifierName(left), IdentifierName(right)));

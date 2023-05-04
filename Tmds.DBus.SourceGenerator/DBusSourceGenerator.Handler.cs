@@ -15,7 +15,7 @@ namespace Tmds.DBus.SourceGenerator
         private ClassDeclarationSyntax GenerateHandler(DBusInterface dBusInterface)
         {
             ClassDeclarationSyntax cl = ClassDeclaration(Pascalize(dBusInterface.Name!))
-                .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.AbstractKeyword))
+                .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.AbstractKeyword))
                 .AddBaseListTypes(
                     SimpleBaseType(ParseTypeName("IMethodHandler")))
                 .AddMembers(

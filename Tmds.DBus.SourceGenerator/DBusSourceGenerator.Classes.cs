@@ -214,7 +214,7 @@ namespace Tmds.DBus.SourceGenerator
                 NamespaceDeclaration(IdentifierName("Tmds.DBus.SourceGenerator"))
                     .AddMembers(
                         ClassDeclaration("SignalHelper")
-                            .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
+                            .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.StaticKeyword))
                             .AddMembers(watchSignalMethod, watchSignalWithReadMethod, watchPropertiesMethod)));
         }
 
@@ -232,7 +232,7 @@ using Tmds.DBus.Protocol;
 #nullable enable
 namespace Tmds.DBus.SourceGenerator
 {
-    public static class VariantReader
+    internal static class VariantReader
     {
         public static DBusVariantItem ReadDBusVariant(this ref Reader reader)
         {
@@ -327,7 +327,7 @@ namespace Tmds.DBus.SourceGenerator
         }
     }
 
-    public static class VariantWriter
+    internal static class VariantWriter
     {
         public static void WriteDBusVariant(this ref MessageWriter writer, DBusVariantItem value)
         {
@@ -398,11 +398,11 @@ namespace Tmds.DBus.SourceGenerator
         }
     }
 
-    public abstract class DBusItem { }
+    internal abstract class DBusItem { }
 
-    public abstract class DBusBasicTypeItem : DBusItem { }
+    internal abstract class DBusBasicTypeItem : DBusItem { }
 
-    public class DBusVariantItem : DBusItem
+    internal class DBusVariantItem : DBusItem
     {
         public DBusVariantItem(string signature, DBusItem value)
         {
@@ -415,7 +415,7 @@ namespace Tmds.DBus.SourceGenerator
         public DBusItem Value { get; }
     }
 
-    public class DBusByteItem : DBusBasicTypeItem
+    internal class DBusByteItem : DBusBasicTypeItem
     {
         public DBusByteItem(byte value)
         {
@@ -425,7 +425,7 @@ namespace Tmds.DBus.SourceGenerator
         public byte Value { get; }
     }
 
-    public class DBusBoolItem : DBusBasicTypeItem
+    internal class DBusBoolItem : DBusBasicTypeItem
     {
         public DBusBoolItem(bool value)
         {
@@ -435,7 +435,7 @@ namespace Tmds.DBus.SourceGenerator
         public bool Value { get; }
     }
 
-    public class DBusInt16Item : DBusBasicTypeItem
+    internal class DBusInt16Item : DBusBasicTypeItem
     {
         public DBusInt16Item(short value)
         {
@@ -445,7 +445,7 @@ namespace Tmds.DBus.SourceGenerator
         public short Value { get; }
     }
 
-    public class DBusUInt16Item : DBusBasicTypeItem
+    internal class DBusUInt16Item : DBusBasicTypeItem
     {
         public DBusUInt16Item(ushort value)
         {
@@ -455,7 +455,7 @@ namespace Tmds.DBus.SourceGenerator
         public ushort Value { get; }
     }
 
-    public class DBusInt32Item : DBusBasicTypeItem
+    internal class DBusInt32Item : DBusBasicTypeItem
     {
         public DBusInt32Item(int value)
         {
@@ -465,7 +465,7 @@ namespace Tmds.DBus.SourceGenerator
         public int Value { get; }
     }
 
-    public class DBusUInt32Item : DBusBasicTypeItem
+    internal class DBusUInt32Item : DBusBasicTypeItem
     {
         public DBusUInt32Item(uint value)
         {
@@ -475,7 +475,7 @@ namespace Tmds.DBus.SourceGenerator
         public uint Value { get; }
     }
 
-    public class DBusInt64Item : DBusBasicTypeItem
+    internal class DBusInt64Item : DBusBasicTypeItem
     {
         public DBusInt64Item(long value)
         {
@@ -485,7 +485,7 @@ namespace Tmds.DBus.SourceGenerator
         public long Value { get; }
     }
 
-    public class DBusUInt64Item : DBusBasicTypeItem
+    internal class DBusUInt64Item : DBusBasicTypeItem
     {
         public DBusUInt64Item(ulong value)
         {
@@ -495,7 +495,7 @@ namespace Tmds.DBus.SourceGenerator
         public ulong Value { get; }
     }
 
-    public class DBusDoubleItem : DBusBasicTypeItem
+    internal class DBusDoubleItem : DBusBasicTypeItem
     {
         public DBusDoubleItem(double value)
         {
@@ -505,7 +505,7 @@ namespace Tmds.DBus.SourceGenerator
         public double Value { get; }
     }
 
-    public class DBusStringItem : DBusBasicTypeItem
+    internal class DBusStringItem : DBusBasicTypeItem
     {
         public DBusStringItem(string value)
         {
@@ -515,7 +515,7 @@ namespace Tmds.DBus.SourceGenerator
         public string Value { get; }
     }
 
-    public class DBusObjectPathItem : DBusBasicTypeItem
+    internal class DBusObjectPathItem : DBusBasicTypeItem
     {
         public DBusObjectPathItem(ObjectPath value)
         {
@@ -525,7 +525,7 @@ namespace Tmds.DBus.SourceGenerator
         public ObjectPath Value { get; }
     }
 
-    public class DBusSignatureItem : DBusBasicTypeItem
+    internal class DBusSignatureItem : DBusBasicTypeItem
     {
         public DBusSignatureItem(Signature value)
         {
@@ -535,7 +535,7 @@ namespace Tmds.DBus.SourceGenerator
         public Signature Value { get; }
     }
 
-    public class DBusArrayItem : DBusItem, IList<DBusItem>
+    internal class DBusArrayItem : DBusItem, IList<DBusItem>
     {
         private readonly IList<DBusItem> _value;
 
@@ -578,7 +578,7 @@ namespace Tmds.DBus.SourceGenerator
         }
     }
 
-    public class DBusDictEntryItem : DBusItem
+    internal class DBusDictEntryItem : DBusItem
     {
         public DBusDictEntryItem(DBusBasicTypeItem key, DBusItem value)
         {
@@ -591,7 +591,7 @@ namespace Tmds.DBus.SourceGenerator
         public DBusItem Value { get; }
     }
 
-    public class DBusStructItem : DBusItem, IList<DBusItem>
+    internal class DBusStructItem : DBusItem, IList<DBusItem>
     {
         private readonly IList<DBusItem> _value;
 

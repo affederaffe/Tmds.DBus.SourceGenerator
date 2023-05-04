@@ -16,7 +16,7 @@ namespace Tmds.DBus.SourceGenerator
         {
             string identifier = Pascalize(dBusInterface.Name!);
             ClassDeclarationSyntax cl = ClassDeclaration(identifier)
-                .AddModifiers(Token(SyntaxKind.PublicKeyword));
+                .AddModifiers(Token(SyntaxKind.InternalKeyword));
 
             FieldDeclarationSyntax interfaceConst = MakePrivateStringConst("Interface", dBusInterface.Name!, PredefinedType(Token(SyntaxKind.StringKeyword)));
             FieldDeclarationSyntax connectionField = MakePrivateReadOnlyField("_connection", ParseTypeName("Connection"));
