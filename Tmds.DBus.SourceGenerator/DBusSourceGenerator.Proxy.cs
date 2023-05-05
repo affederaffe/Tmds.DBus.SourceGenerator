@@ -258,7 +258,7 @@ namespace Tmds.DBus.SourceGenerator
                         Argument(
                             MakeMemberAccessExpression("ReaderExtensions", GetOrAddReadMessageMethod(dBusProperty))));
 
-                return MethodDeclaration(ParseTypeName(ParseTaskReturnType(dBusProperty)), $"Get{Pascalize(dBusProperty.Name!)}Async")
+                return MethodDeclaration(ParseTypeName(ParseTaskReturnType(dBusProperty)), $"Get{Pascalize(dBusProperty.Name!)}PropertyAsync")
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .WithBody(
                     MakeCallMethodReturnBody(args, createMessageBody));
@@ -286,7 +286,7 @@ namespace Tmds.DBus.SourceGenerator
                         InvocationExpression(
                             IdentifierName("CreateMessage")))));
 
-            return MethodDeclaration(ParseTypeName("Task"), $"Set{dBusProperty.Name}Async")
+            return MethodDeclaration(ParseTypeName("Task"), $"Set{dBusProperty.Name}PropertyAsync")
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(
                     Parameter(Identifier("value")).WithType(ParseTypeName(dBusProperty.DotNetType)))
@@ -323,7 +323,7 @@ namespace Tmds.DBus.SourceGenerator
                                         .WithRefKindKeyword(Token(SyntaxKind.RefKeyword))))));
 
             cl = cl.AddMembers(
-                MethodDeclaration(ParseTypeName("Task<Properties>"), "GetAllAsync")
+                MethodDeclaration(ParseTypeName("Task<Properties>"), "GetAllPropertiesAsync")
                     .AddModifiers(Token(SyntaxKind.PublicKeyword))
                     .WithBody(
                         Block(
