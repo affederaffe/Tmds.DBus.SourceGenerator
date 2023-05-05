@@ -12,6 +12,8 @@ Either install the NuGet package `Tmds.DBus.SourceGenerator` or clone the git re
 <ItemGroup>
     <ProjectReference Include="./Tmds.DBus.SourceGenerator/Tmds.DBus.SourceGenerator/Tmds.DBus.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
 </ItemGroup>
+
+<Import Project="./Tmds.DBus.SourceGenerator/Tmds.DBus.SourceGenerator/Tmds.DBus.SourceGenerator.props" />
 ```
 
 Then add the xml definitions as `AdditionalFile`s to your project.
