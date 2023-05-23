@@ -6,6 +6,10 @@ This source generator completely eliminates the usage of reflection in order to 
 For further documentation of Tmds.DBus and DBus in general, see https://github.com/tmds/Tmds.DBus#readme.
 
 ### Usage
+
+##### Note
+> This Source Generator targets the `Tmds.DBus.Protocol` API, which means you have to explicitly install said package.
+
 Either install the NuGet package `Tmds.DBus.SourceGenerator` or clone the git repository and add a project reference to the source generator in your `.csproj`
 
 ```xml
