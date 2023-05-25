@@ -8,6 +8,7 @@
         <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <DevelopmentDependency>true</DevelopmentDependency>
+        <IsRosylnComponent>true</IsRosylnComponent>
         <IncludeBuildOutput>false</IncludeBuildOutput>
         <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
         <SignAssembly>true</SignAssembly>
@@ -16,7 +17,7 @@
     </PropertyGroup>
 
     <PropertyGroup>
-        <Version>0.0.7</Version>
+        <Version>0.0.8</Version>
         <PackageId>Tmds.DBus.SourceGenerator</PackageId>
         <Authors>affederaffe</Authors>
         <Copyright>affederaffe</Copyright>
