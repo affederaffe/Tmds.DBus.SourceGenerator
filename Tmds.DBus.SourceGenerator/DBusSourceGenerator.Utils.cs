@@ -299,7 +299,7 @@ namespace Tmds.DBus.SourceGenerator
                                                                 MakeMemberAccessExpression("reader", "ReadArrayStart"))
                                                             .AddArgumentListArguments(
                                                                 Argument(
-                                                                    MakeMemberAccessExpression("DBusType", Enum.GetName(typeof(DBusType), dBusValue.InnerDBusTypes![0].DBusType)!))))))),
+                                                                    MakeMemberAccessExpression("DBusType", "Struct"))))))),
                                 WhileStatement(
                                     InvocationExpression(
                                             MakeMemberAccessExpression("reader", "HasNext"))
@@ -311,7 +311,7 @@ namespace Tmds.DBus.SourceGenerator
                                             .AddArgumentListArguments(
                                                 Argument(
                                                     InvocationExpression(
-                                                        MakeMemberAccessExpression("reader", GetOrAddReadMethod(dBusValue.InnerDBusTypes[0])))),
+                                                        MakeMemberAccessExpression("reader", GetOrAddReadMethod(dBusValue.InnerDBusTypes![0])))),
                                                 Argument(
                                                     InvocationExpression(
                                                         MakeMemberAccessExpression("reader", GetOrAddReadMethod(dBusValue.InnerDBusTypes[1]))))))),
