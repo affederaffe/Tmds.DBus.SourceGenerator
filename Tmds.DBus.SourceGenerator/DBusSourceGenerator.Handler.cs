@@ -216,6 +216,39 @@ namespace Tmds.DBus.SourceGenerator
                                             inArgs.Select(static (x, i) =>
                                                 Argument(
                                                     IdentifierName(x.Name is not null ? SanitizeIdentifier(x.Name) : $"arg{i}"))).ToArray())))))));
+
+                        BlockSyntax replyMethodBlock = Block(
+                            LocalDeclarationStatement(
+                                VariableDeclaration(ParseTypeName("MessageWriter"))
+                                    .AddVariables(
+                                        VariableDeclarator("writer")
+                                            .WithInitializer(
+                                                EqualsValueClause(
+                                                    InvocationExpression(
+                                                            MakeMemberAccessExpression("context", "CreateReplyWriter"))
+                                                        .AddArgumentListArguments(
+                                                            Argument(
+                                                                PostfixUnaryExpression(SyntaxKind.SuppressNullableWarningExpression, LiteralExpression(SyntaxKind.NullLiteralExpression)))))))),
+                            ExpressionStatement(
+                                InvocationExpression(
+                                        MakeMemberAccessExpression("context", "Reply"))
+                                    .AddArgumentListArguments(
+                                        Argument(
+                                            InvocationExpression(
+                                                MakeMemberAccessExpression("writer", "CreateMessage"))))),
+                            ExpressionStatement(
+                                InvocationExpression(
+                                    MakeMemberAccessExpression("writer", "Dispose"))));
+
+                        switchSectionBlock = switchSectionBlock.AddStatements(
+                            IfStatement(
+                                PrefixUnaryExpression(SyntaxKind.LogicalNotExpression, MakeMemberAccessExpression("context", "NoReplyExpected")),
+                                ExpressionStatement(
+                                    InvocationExpression(
+                                        IdentifierName("Reply")))),
+                            LocalFunctionStatement(
+                                    PredefinedType(Token(SyntaxKind.VoidKeyword)), Identifier("Reply"))
+                                .WithBody(replyMethodBlock));
                     }
                 }
 

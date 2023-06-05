@@ -17,7 +17,7 @@
     </PropertyGroup>
 
     <PropertyGroup>
-        <Version>0.0.8</Version>
+        <Version>0.0.9</Version>
         <PackageId>Tmds.DBus.SourceGenerator</PackageId>
         <Authors>affederaffe</Authors>
         <Copyright>affederaffe</Copyright>
