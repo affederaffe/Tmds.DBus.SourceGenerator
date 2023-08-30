@@ -1,5 +1,8 @@
 using System;
+using System.IO;
 using System.Linq;
+using System.Xml;
+using System.Xml.Serialization;
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -53,6 +56,7 @@ namespace Tmds.DBus.SourceGenerator
             AddHandlerMethods(ref cl, ref switchStatement, dBusInterface);
             AddHandlerSignals(ref cl, dBusInterface);
             AddHandlerProperties(ref cl, ref switchStatement, dBusInterface);
+            AddHandlerIntrospect(ref switchStatement, dBusInterface);
 
             if (dBusInterface.Properties?.Length > 0)
                 cl = cl.AddMembers(
@@ -89,13 +93,28 @@ namespace Tmds.DBus.SourceGenerator
                 DBusArgument[]? inArgs = dBusMethod.Arguments?.Where(static m => m.Direction is null or "in").ToArray();
                 DBusArgument[]? outArgs = dBusMethod.Arguments?.Where(static m => m.Direction == "out").ToArray();
 
-                SwitchSectionSyntax switchSection = SwitchSection()
-                    .AddLabels(
+                SwitchSectionSyntax switchSection = SwitchSection();
+
+                if (inArgs?.Length > 0)
+                    switchSection = switchSection.AddLabels(
                         CaseSwitchLabel(
                             TupleExpression()
                                 .AddArguments(
                                     Argument(MakeLiteralExpression(dBusMethod.Name!)),
-                                    Argument(inArgs?.Length > 0 ? MakeLiteralExpression(ParseSignature(inArgs)!) : LiteralExpression(SyntaxKind.NullLiteralExpression)))));
+                                    Argument(MakeLiteralExpression(ParseSignature(inArgs)!)))));
+                else
+                    switchSection = switchSection.AddLabels(
+                        CasePatternSwitchLabel(
+                            RecursivePattern()
+                                .WithPositionalPatternClause(
+                                    PositionalPatternClause()
+                                        .AddSubpatterns(
+                                            Subpattern(
+                                                ConstantPattern(MakeLiteralExpression("Introspect"))),
+                                            Subpattern(
+                                                BinaryPattern(SyntaxKind.OrPattern, ConstantPattern(MakeLiteralExpression(string.Empty)),
+                                                    ConstantPattern(LiteralExpression(SyntaxKind.NullLiteralExpression)))))),
+                            Token(SyntaxKind.ColonToken)));
 
                 BlockSyntax switchSectionBlock = Block();
 
@@ -560,6 +579,71 @@ namespace Tmds.DBus.SourceGenerator
                         BreakStatement()));
 
             AddPropertiesClass(ref cl, dBusInterface);
+        }
+
+        private void AddHandlerIntrospect(ref SwitchStatementSyntax sw, DBusInterface dBusInterface)
+        {
+            XmlSerializer xmlSerializer = new(typeof(DBusNode));
+            using StringWriter stringWriter = new();
+            using XmlWriter xmlWriter = XmlWriter.Create(stringWriter, new XmlWriterSettings { OmitXmlDeclaration = true, Indent = true });
+            xmlWriter.WriteRaw("""
+                                    <!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+                                    "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+                                    """);
+            xmlSerializer.Serialize(xmlWriter, new DBusNode { Interfaces = new[] { dBusInterface } });
+            string introspect = stringWriter.ToString();
+            sw = sw.AddSections(
+                SwitchSection()
+                    .AddLabels(
+                        CaseSwitchLabel(MakeLiteralExpression("org.freedesktop.DBus.Introspectable")))
+                    .AddStatements(
+                        SwitchStatement(
+                            TupleExpression()
+                                .AddArguments(
+                                    Argument(MakeMemberAccessExpression("context", "Request", "MemberAsString")),
+                                    Argument(MakeMemberAccessExpression("context", "Request", "SignatureAsString"))))
+                            .AddSections(
+                                SwitchSection()
+                                    .AddLabels(
+                                        CasePatternSwitchLabel(
+                                            RecursivePattern()
+                                                .WithPositionalPatternClause(
+                                                    PositionalPatternClause()
+                                                        .AddSubpatterns(
+                                                            Subpattern(
+                                                                ConstantPattern(MakeLiteralExpression("Introspect"))),
+                                                            Subpattern(
+                                                                BinaryPattern(SyntaxKind.OrPattern, ConstantPattern(MakeLiteralExpression(string.Empty)), ConstantPattern(LiteralExpression(SyntaxKind.NullLiteralExpression)))))),
+                                            Token(SyntaxKind.ColonToken)))
+                                    .AddStatements(
+                                        Block(
+                                            ExpressionStatement(
+                                                InvocationExpression(IdentifierName("Reply"))),
+                                            LocalFunctionStatement(PredefinedType(Token(SyntaxKind.VoidKeyword)), Identifier("Reply"))
+                                                .AddBodyStatements(
+                                                    LocalDeclarationStatement(
+                                                        VariableDeclaration(ParseTypeName("MessageWriter"))
+                                                            .AddVariables(
+                                                                VariableDeclarator("writer")
+                                                                    .WithInitializer(
+                                                                        EqualsValueClause(
+                                                                            InvocationExpression(
+                                                                                    MakeMemberAccessExpression("context", "CreateReplyWriter"))
+                                                                                .AddArgumentListArguments(
+                                                                                    Argument(MakeLiteralExpression("s"))))))),
+                                                    ExpressionStatement(
+                                                        InvocationExpression(
+                                                                MakeMemberAccessExpression("writer", GetOrAddWriteMethod(new DBusValue { Type = "s" })))
+                                                            .AddArgumentListArguments(
+                                                                Argument(MakeLiteralExpression(introspect)))),
+                                                    ExpressionStatement(
+                                                        InvocationExpression(
+                                                                MakeMemberAccessExpression("context", "Reply"))
+                                                            .AddArgumentListArguments(
+                                                                Argument(
+                                                                    InvocationExpression(MakeMemberAccessExpression("writer", "CreateMessage")))))),
+                                            BreakStatement()))),
+                        BreakStatement()));
         }
 
         private void AddHandlerSignals(ref ClassDeclarationSyntax cl, DBusInterface dBusInterface)

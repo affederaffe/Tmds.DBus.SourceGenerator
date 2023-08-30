@@ -60,7 +60,6 @@ namespace Tmds.DBus.SourceGenerator
                                 NamespaceDeclarationSyntax namespaceDeclaration = NamespaceDeclaration(IdentifierName("Tmds.DBus.SourceGenerator")).AddMembers(typeDeclarationSyntax);
                                 CompilationUnitSyntax compilationUnit = MakeCompilationUnit(namespaceDeclaration);
                                 productionContext.AddSource($"Tmds.DBus.SourceGenerator.{Pascalize(dBusInterface.Name!)}.g.cs", compilationUnit.GetText(Encoding.UTF8));
-
                             }
                             break;
                         case "Handler":
