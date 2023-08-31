@@ -394,6 +394,12 @@ namespace Tmds.DBus.SourceGenerator
                     foreach (DBusItem item in structItem)
                         writer.WriteDBusItem(item);
                     break;
+                case DBusByteArrayItem byteArrayItem:
+                    ArrayStart byteArrayStart = writer.WriteArrayStart(DBusType.Byte);
+                    foreach (byte item in byteArrayItem)
+                        writer.WriteByte(item);
+                    writer.WriteArrayEnd(byteArrayStart);
+                    break;
             }
         }
     }
@@ -535,14 +541,14 @@ namespace Tmds.DBus.SourceGenerator
         public Signature Value { get; }
     }
 
-    internal class DBusArrayItem : DBusItem, IList<DBusItem>
+    internal class DBusArrayItem : DBusItem, IReadOnlyList<DBusItem>
     {
-        private readonly IList<DBusItem> _value;
+        private readonly IReadOnlyList<DBusItem> _value;
 
-        public DBusArrayItem(DBusType arrayType, IEnumerable<DBusItem> value)
+        public DBusArrayItem(DBusType arrayType, IReadOnlyList<DBusItem> value)
         {
-            _value = value.ToList();
             ArrayType = arrayType;
+            _value = value;
         }
 
         public DBusType ArrayType { get; }
@@ -551,31 +557,9 @@ namespace Tmds.DBus.SourceGenerator
 
         IEnumerator IEnumerable.GetEnumerator() => ((IEnumerable)_value).GetEnumerator();
 
-        public void Add(DBusItem item) => _value.Add(item);
-
-        public void Clear() => _value.Clear();
-
-        public bool Contains(DBusItem item) => _value.Contains(item);
-
-        public void CopyTo(DBusItem[] array, int arrayIndex) => _value.CopyTo(array, arrayIndex);
-
-        public bool Remove(DBusItem item) => _value.Remove(item);
-
         public int Count => _value.Count;
 
-        public bool IsReadOnly => _value.IsReadOnly;
-
-        public int IndexOf(DBusItem item) => _value.IndexOf(item);
-
-        public void Insert(int index, DBusItem item) => _value.Insert(index, item);
-
-        public void RemoveAt(int index) => _value.RemoveAt(index);
-
-        public DBusItem this[int index]
-        {
-            get => _value[index];
-            set => _value[index] = value;
-        }
+        public DBusItem this[int index] => _value[index];
     }
 
     internal class DBusDictEntryItem : DBusItem
@@ -591,44 +575,40 @@ namespace Tmds.DBus.SourceGenerator
         public DBusItem Value { get; }
     }
 
-    internal class DBusStructItem : DBusItem, IList<DBusItem>
+    internal class DBusStructItem : DBusItem, IReadOnlyList<DBusItem>
     {
-        private readonly IList<DBusItem> _value;
+        private readonly IReadOnlyList<DBusItem> _value;
 
-        public DBusStructItem(IEnumerable<DBusItem> value)
+        public DBusStructItem(IReadOnlyList<DBusItem> value)
         {
-            _value = value.ToList();
+            _value = value;
         }
 
         public IEnumerator<DBusItem> GetEnumerator() => _value.GetEnumerator();
 
         IEnumerator IEnumerable.GetEnumerator() => ((IEnumerable)_value).GetEnumerator();
 
-        public void Add(DBusItem item) => _value.Add(item);
+        public int Count => _value.Count;
 
-        public void Clear() => _value.Clear();
+        public DBusItem this[int index] => _value[index];
+    }
 
-        public bool Contains(DBusItem item) => _value.Contains(item);
+    internal class DBusByteArrayItem : DBusItem, IReadOnlyList<byte>
+    {
+        private readonly IReadOnlyList<byte> _value;
 
-        public void CopyTo(DBusItem[] array, int arrayIndex) => _value.CopyTo(array, arrayIndex);
+        public DBusByteArrayItem(IReadOnlyList<byte> value)
+        {
+            _value = value;
+        }
 
-        public bool Remove(DBusItem item) => _value.Remove(item);
+        public IEnumerator<byte> GetEnumerator() => _value.GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => ((IEnumerable)_value).GetEnumerator();
 
         public int Count => _value.Count;
 
-        public bool IsReadOnly => _value.IsReadOnly;
-
-        public int IndexOf(DBusItem item) => _value.IndexOf(item);
-
-        public void Insert(int index, DBusItem item) => _value.Insert(index, item);
-
-        public void RemoveAt(int index) => _value.RemoveAt(index);
-
-        public DBusItem this[int index]
-        {
-            get => _value[index];
-            set => _value[index] = value;
-        }
+        public byte this[int index] => _value[index];
     }
 }
 """;

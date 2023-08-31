@@ -137,14 +137,16 @@ namespace Tmds.DBus.SourceGenerator
                         Argument(MakeMemberAccessExpression("DBusType", Enum.GetName(typeof(DBusType), dBusValue.InnerDBusTypes![0].DBusType)!)),
                         Argument(
                             InvocationExpression(
-                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, accessValueExpression, IdentifierName("Select")))
-                                .AddArgumentListArguments(
-                                    Argument(
-                                        SimpleLambdaExpression(
-                                            Parameter(
-                                                Identifier("x")))
-                                            .WithExpressionBody(
-                                                MakeGetDBusVariantExpression(dBusValue.InnerDBusTypes![0], IdentifierName("x"))))))),
+                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, 
+                                    InvocationExpression(
+                                            MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, accessValueExpression, IdentifierName("Select")))
+                                        .AddArgumentListArguments(
+                                            Argument(
+                                                SimpleLambdaExpression(
+                                                        Parameter(
+                                                            Identifier("x")))
+                                                    .WithExpressionBody(
+                                                        MakeGetDBusVariantExpression(dBusValue.InnerDBusTypes![0], IdentifierName("x"))))), IdentifierName("ToArray"))))),
                 DBusType.DictEntry => InvocationExpression(
                     ObjectCreationExpression(
                         ParseTypeName("DBusDictEntryItem")))
