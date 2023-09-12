@@ -256,7 +256,7 @@ namespace Tmds.DBus.SourceGenerator
                         InvocationExpression(
                             IdentifierName("CreateMessage"))),
                         Argument(
-                            MakeMemberAccessExpression("ReaderExtensions", GetOrAddReadMessageMethod(dBusProperty))));
+                            MakeMemberAccessExpression("ReaderExtensions", GetOrAddReadMessageMethod(dBusProperty, true))));
 
                 return MethodDeclaration(ParseTypeName(ParseTaskReturnType(dBusProperty)), $"Get{Pascalize(dBusProperty.Name!)}PropertyAsync")
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))

@@ -354,11 +354,11 @@ namespace Tmds.DBus.SourceGenerator
             return identifier;
         }
 
-        private string GetOrAddReadMessageMethod(DBusValue dBusValue) => GetOrAddReadMessageMethod(new[] { dBusValue });
+        private string GetOrAddReadMessageMethod(DBusValue dBusValue, bool isVariant = false) => GetOrAddReadMessageMethod(new[] { dBusValue }, isVariant);
 
-        private string GetOrAddReadMessageMethod(IReadOnlyList<DBusValue> dBusValues)
+        private string GetOrAddReadMessageMethod(IReadOnlyList<DBusValue> dBusValues, bool isVariant = false)
         {
-            string identifier = $"ReadMessage_{SanitizeSignature(ParseSignature(dBusValues)!)}";
+            string identifier = $"ReadMessage_{(isVariant ? "v_" : null)}{SanitizeSignature(ParseSignature(dBusValues)!)}";
             if (_readMethodExtensions.ContainsKey(identifier))
                 return identifier;
 
@@ -372,6 +372,14 @@ namespace Tmds.DBus.SourceGenerator
                                         EqualsValueClause(
                                             InvocationExpression(
                                                 MakeMemberAccessExpression("message", "GetBodyReader")))))));
+
+            if (isVariant)
+                block = block.AddStatements(
+                    ExpressionStatement(
+                        InvocationExpression(
+                                MakeMemberAccessExpression("reader", "ReadSignature"))
+                            .AddArgumentListArguments(
+                                Argument(MakeLiteralExpression(dBusValues[0].Type!)))));
 
             if (dBusValues.Count == 1)
             {
