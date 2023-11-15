@@ -71,7 +71,7 @@ namespace Tmds.DBus.SourceGenerator
                                 Argument(IdentifierName(x.Name is not null ? SanitizeIdentifier(x.Name) : $"arg{i}")))))
                     .ToArray() ?? Array.Empty<ExpressionStatementSyntax>();
 
-                BlockSyntax createMessageBody = MakeCreateMessageBody(IdentifierName("Interface"), Pascalize(dBusMethod.Name!), ParseSignature(inArgs), statements);
+                BlockSyntax createMessageBody = MakeCreateMessageBody(IdentifierName("Interface"), dBusMethod.Name!, ParseSignature(inArgs), statements);
 
                 MethodDeclarationSyntax proxyMethod = MethodDeclaration(ParseTypeName(returnType), $"{Pascalize(dBusMethod.Name!)}Async")
                     .AddModifiers(Token(SyntaxKind.PublicKeyword));
