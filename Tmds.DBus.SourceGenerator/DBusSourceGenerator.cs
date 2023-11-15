@@ -38,17 +38,19 @@ namespace Tmds.DBus.SourceGenerator
                 .Combine(context.AnalyzerConfigOptionsProvider)
                 .Select((x, _) =>
                 {
-                    if (!x.Right.GetOptions(x.Left).TryGetValue("build_metadata.AdditionalFiles.DBusGeneratorMode", out string? generatorMode)) return null;
-                    if (xmlSerializer.Deserialize(XmlReader.Create(new StringReader(x.Left.GetText()!.ToString()), xmlReaderSettings)) is not DBusNode dBusNode) return null;
-                    if (dBusNode.Interfaces is null) return null;
-                    return Tuple.Create(dBusNode, generatorMode);
+                    if (!x.Right.GetOptions(x.Left).TryGetValue("build_metadata.AdditionalFiles.DBusGeneratorMode", out string? generatorMode))
+                        return null;
+                    if (xmlSerializer.Deserialize(XmlReader.Create(new StringReader(x.Left.GetText()!.ToString()), xmlReaderSettings)) is not DBusNode dBusNode)
+                        return null;
+                    return dBusNode.Interfaces is null ? null : Tuple.Create(dBusNode, generatorMode);
                 })
                 .Where(static x => x is not null)
                 .Select(static (x, _) => x.ToValueTuple());
 
             context.RegisterSourceOutput(generatorProvider.Collect(), (productionContext, provider) =>
             {
-                if (provider.IsEmpty) return;
+                if (provider.IsEmpty)
+                    return;
                 foreach ((DBusNode Node, string GeneratorMode) value in provider)
                 {
                     switch (value.GeneratorMode)

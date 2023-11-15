@@ -60,16 +60,19 @@ namespace Tmds.DBus.SourceGenerator
                                 IdentifierName("CreateMessage")))));
 
                 if (outArgs?.Length > 0)
+                {
                     args = args.AddArguments(
                         Argument(
                             MakeMemberAccessExpression("ReaderExtensions", GetOrAddReadMessageMethod(outArgs))));
+                }
 
-                ExpressionStatementSyntax[] statements = inArgs?.Select((x, i) => ExpressionStatement(
+                StatementSyntax[] statements = inArgs?.Select((x, i) => ExpressionStatement(
                         InvocationExpression(
                                 MakeMemberAccessExpression("writer", GetOrAddWriteMethod(x)))
                             .AddArgumentListArguments(
                                 Argument(IdentifierName(x.Name is not null ? SanitizeIdentifier(x.Name) : $"arg{i}")))))
-                    .ToArray() ?? Array.Empty<ExpressionStatementSyntax>();
+                    .Cast<StatementSyntax>()
+                    .ToArray() ?? Array.Empty<StatementSyntax>();
 
                 BlockSyntax createMessageBody = MakeCreateMessageBody(IdentifierName("Interface"), dBusMethod.Name!, ParseSignature(inArgs), statements);
 
@@ -77,8 +80,7 @@ namespace Tmds.DBus.SourceGenerator
                     .AddModifiers(Token(SyntaxKind.PublicKeyword));
 
                 if (inArgs is not null)
-                    proxyMethod = proxyMethod
-                        .WithParameterList(ParseParameterList(inArgs));
+                    proxyMethod = proxyMethod.WithParameterList(ParseParameterList(inArgs));
 
                 cl = cl.AddMembers(proxyMethod.WithBody(MakeCallMethodReturnBody(args, createMessageBody)));
             }
@@ -112,8 +114,10 @@ namespace Tmds.DBus.SourceGenerator
                         Argument(IdentifierName("rule")));
 
                 if (outArgs is not null)
+                {
                     arguments = arguments.AddArguments(
                         Argument(MakeMemberAccessExpression("ReaderExtensions", GetOrAddReadMessageMethod(outArgs))));
+                }
 
                 arguments = arguments.AddArguments(
                     Argument(IdentifierName("handler")),

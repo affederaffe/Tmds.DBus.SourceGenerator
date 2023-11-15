@@ -137,7 +137,7 @@ namespace Tmds.DBus.SourceGenerator
                         Argument(MakeMemberAccessExpression("DBusType", Enum.GetName(typeof(DBusType), dBusValue.InnerDBusTypes![0].DBusType)!)),
                         Argument(
                             InvocationExpression(
-                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, 
+                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
                                     InvocationExpression(
                                             MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, accessValueExpression, IdentifierName("Select")))
                                         .AddArgumentListArguments(
@@ -374,12 +374,14 @@ namespace Tmds.DBus.SourceGenerator
                                                 MakeMemberAccessExpression("message", "GetBodyReader")))))));
 
             if (isVariant)
+            {
                 block = block.AddStatements(
                     ExpressionStatement(
                         InvocationExpression(
                                 MakeMemberAccessExpression("reader", "ReadSignature"))
                             .AddArgumentListArguments(
                                 Argument(MakeLiteralExpression(dBusValues[0].Type!)))));
+            }
 
             if (dBusValues.Count == 1)
             {
@@ -544,7 +546,9 @@ namespace Tmds.DBus.SourceGenerator
                                                     MakeMemberAccessExpression("writer", GetOrAddWriteMethod(x)))
                                                 .AddArgumentListArguments(
                                                     Argument(
-                                                        MakeMemberAccessExpression("value", $"Item{i + 1}"))))).ToArray())));
+                                                        MakeMemberAccessExpression("value", $"Item{i + 1}")))))
+                                    .Cast<StatementSyntax>()
+                                    .ToArray())));
 
             return identifier;
         }

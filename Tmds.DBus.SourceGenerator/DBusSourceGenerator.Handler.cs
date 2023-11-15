@@ -59,6 +59,7 @@ namespace Tmds.DBus.SourceGenerator
             AddHandlerIntrospect(ref switchStatement, dBusInterface);
 
             if (dBusInterface.Properties?.Length > 0)
+            {
                 cl = cl.AddMembers(
                     MakeGetOnlyProperty(ParseTypeName("Properties"), "BackingProperties", Token(SyntaxKind.PublicKeyword))
                         .WithInitializer(
@@ -66,6 +67,7 @@ namespace Tmds.DBus.SourceGenerator
                                 InvocationExpression(
                                     ObjectCreationExpression(ParseTypeName("Properties")))))
                         .WithSemicolonToken(Token(SyntaxKind.SemicolonToken)));
+            }
 
             cl = cl.AddMembers(
                 MethodDeclaration(PredefinedType(Token(SyntaxKind.BoolKeyword)), "RunMethodHandlerSynchronously")
@@ -84,7 +86,8 @@ namespace Tmds.DBus.SourceGenerator
 
         private void AddHandlerMethods(ref ClassDeclarationSyntax cl, ref SwitchStatementSyntax sw, DBusInterface dBusInterface)
         {
-            if (dBusInterface.Methods is null) return;
+            if (dBusInterface.Methods is null)
+                return;
 
             SyntaxList<SwitchSectionSyntax> switchSections = List<SwitchSectionSyntax>();
 
@@ -96,13 +99,16 @@ namespace Tmds.DBus.SourceGenerator
                 SwitchSectionSyntax switchSection = SwitchSection();
 
                 if (inArgs?.Length > 0)
+                {
                     switchSection = switchSection.AddLabels(
                         CaseSwitchLabel(
                             TupleExpression()
                                 .AddArguments(
                                     Argument(MakeLiteralExpression(dBusMethod.Name!)),
                                     Argument(MakeLiteralExpression(ParseSignature(inArgs)!)))));
+                }
                 else
+                {
                     switchSection = switchSection.AddLabels(
                         CasePatternSwitchLabel(
                             RecursivePattern()
@@ -115,6 +121,7 @@ namespace Tmds.DBus.SourceGenerator
                                                 BinaryPattern(SyntaxKind.OrPattern, ConstantPattern(MakeLiteralExpression(string.Empty)),
                                                     ConstantPattern(LiteralExpression(SyntaxKind.NullLiteralExpression)))))),
                             Token(SyntaxKind.ColonToken)));
+                }
 
                 BlockSyntax switchSectionBlock = Block();
 
@@ -426,7 +433,8 @@ namespace Tmds.DBus.SourceGenerator
 
         private void AddHandlerProperties(ref ClassDeclarationSyntax cl, ref SwitchStatementSyntax sw, DBusInterface dBusInterface)
         {
-            if (dBusInterface.Properties is null) return;
+            if (dBusInterface.Properties is null)
+                return;
 
             sw = sw.AddSections(
                 SwitchSection()
@@ -648,18 +656,21 @@ namespace Tmds.DBus.SourceGenerator
 
         private void AddHandlerSignals(ref ClassDeclarationSyntax cl, DBusInterface dBusInterface)
         {
-            if (dBusInterface.Signals is null) return;
+            if (dBusInterface.Signals is null)
+                return;
             foreach (DBusSignal dBusSignal in dBusInterface.Signals)
             {
                 MethodDeclarationSyntax method = MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), $"Emit{Pascalize(dBusSignal.Name!)}")
                     .AddModifiers(Token(SyntaxKind.ProtectedKeyword));
 
                 if (dBusSignal.Arguments?.Length > 0)
+                {
                     method = method.WithParameterList(
                         ParameterList(
                             SeparatedList(
                                 dBusSignal.Arguments.Select(
                                     static (x, i) => Parameter(Identifier(x.Name is not null ? SanitizeIdentifier(x.Name) : $"arg{i}")).WithType(ParseTypeName(x.DotNetType))))));
+                }
 
                 BlockSyntax body = Block();
 
@@ -679,8 +690,10 @@ namespace Tmds.DBus.SourceGenerator
                         Argument(MakeLiteralExpression(dBusSignal.Name!)));
 
                 if (dBusSignal.Arguments?.Length > 0)
+                {
                     args = args.AddArguments(
                         Argument(MakeLiteralExpression(ParseSignature(dBusSignal.Arguments)!)));
+                }
 
                 body = body.AddStatements(
                     ExpressionStatement(

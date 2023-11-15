@@ -40,7 +40,8 @@ namespace Tmds.DBus.SourceGenerator
 
         private static string? ParseSignature(IReadOnlyList<DBusValue>? dBusValues)
         {
-            if (dBusValues is null || dBusValues.Count == 0) return null;
+            if (dBusValues is null || dBusValues.Count == 0)
+                return null;
             StringBuilder sb = new();
             foreach (DBusValue dBusValue in dBusValues.Where(static argument => argument.Type is not null))
                 sb.Append(dBusValue.Type);

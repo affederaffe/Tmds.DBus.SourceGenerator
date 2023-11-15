@@ -7,7 +7,7 @@ namespace Tmds.DBus.SourceGenerator
     {
         private ReadOnlySpan<byte> _signature;
 
-        public ReadOnlySpan<byte> Signature => _signature;
+        public readonly ReadOnlySpan<byte> Signature => _signature;
 
         public SignatureReader(ReadOnlySpan<byte> signature)
         {
@@ -49,7 +49,8 @@ namespace Tmds.DBus.SourceGenerator
         {
             length = 0;
 
-            if (signature.IsEmpty) return DBusType.Invalid;
+            if (signature.IsEmpty)
+                return DBusType.Invalid;
 
             DBusType type = (DBusType)signature[0];
 
@@ -57,39 +58,34 @@ namespace Tmds.DBus.SourceGenerator
             {
                 length = 1;
             }
-            else if (type == DBusType.Variant)
-            {
-                length = 1;
-            }
-            else if (type == DBusType.Array)
-            {
-                if (ReadSingleType(signature.Slice(1), out int elementLength) != DBusType.Invalid)
-                {
-                    type = DBusType.Array;
-                    length = elementLength + 1;
-                }
-                else
-                {
-                    type = DBusType.Invalid;
-                }
-            }
-            else if (type == DBusType.Struct)
-            {
-                length = DetermineLength(signature.Slice(1), (byte)'(', (byte)')');
-                if (length == 0) type = DBusType.Invalid;
-            }
-            else if (type == DBusType.DictEntry)
-            {
-                length = DetermineLength(signature.Slice(1), (byte)'{', (byte)'}');
-                if (length < 4 ||
-                    !IsBasicType((DBusType)signature[1]) ||
-                    ReadSingleType(signature.Slice(2), out int valueTypeLength) == DBusType.Invalid ||
-                    length != valueTypeLength + 3)
-                    type = DBusType.Invalid;
-            }
             else
             {
-                type = DBusType.Invalid;
+                switch (type)
+                {
+                    case DBusType.Variant:
+                        length = 1;
+                        break;
+                    case DBusType.Array when ReadSingleType(signature.Slice(1), out int elementLength) != DBusType.Invalid:
+                        type = DBusType.Array;
+                        length = elementLength + 1;
+                        break;
+                    case DBusType.Struct:
+                        length = DetermineLength(signature.Slice(1), (byte)'(', (byte)')');
+                        if (length == 0)
+                            type = DBusType.Invalid;
+                        break;
+                    case DBusType.DictEntry:
+                        length = DetermineLength(signature.Slice(1), (byte)'{', (byte)'}');
+                        if (length < 4 ||
+                            !IsBasicType((DBusType)signature[1]) ||
+                            ReadSingleType(signature.Slice(2), out int valueTypeLength) == DBusType.Invalid ||
+                            length != valueTypeLength + 3)
+                            type = DBusType.Invalid;
+                        break;
+                    default:
+                        type = DBusType.Invalid;
+                        break;
+                }
             }
 
             return type;
@@ -102,7 +98,8 @@ namespace Tmds.DBus.SourceGenerator
             do
             {
                 int offset = span.IndexOfAny(startChar, endChar);
-                if (offset == -1) return 0;
+                if (offset == -1)
+                    return 0;
 
                 if (span[offset] == startChar)
                     count++;
@@ -118,28 +115,30 @@ namespace Tmds.DBus.SourceGenerator
 
         private static bool IsBasicType(DBusType type) => type is DBusType.Byte or DBusType.Bool or DBusType.Int16 or DBusType.UInt16 or DBusType.Int32 or DBusType.UInt32 or DBusType.Int64 or DBusType.UInt64 or DBusType.Double or DBusType.String or DBusType.ObjectPath or DBusType.Signature or DBusType.UnixFd;
 
-        public static ReadOnlySpan<byte> ReadSingleType(ref ReadOnlySpan<byte> signature)
+        private static ReadOnlySpan<byte> ReadSingleType(ref ReadOnlySpan<byte> signature)
         {
-            if (signature.Length == 0) return default;
+            if (signature.Length == 0)
+                return default;
 
             int length;
             DBusType type = (DBusType)signature[0];
-            if (type == DBusType.Struct)
+            switch (type)
             {
-                length = DetermineLength(signature.Slice(1), (byte)'(', (byte)')');
-            }
-            else if (type == DBusType.DictEntry)
-            {
-                length = DetermineLength(signature.Slice(1), (byte)'{', (byte)'}');
-            }
-            else if (type == DBusType.Array)
-            {
-                ReadOnlySpan<byte> remainder = signature.Slice(1);
-                length = 1 + ReadSingleType(ref remainder).Length;
-            }
-            else
-            {
-                length = 1;
+                case DBusType.Struct:
+                    length = DetermineLength(signature.Slice(1), (byte)'(', (byte)')');
+                    break;
+                case DBusType.DictEntry:
+                    length = DetermineLength(signature.Slice(1), (byte)'{', (byte)'}');
+                    break;
+                case DBusType.Array:
+                {
+                    ReadOnlySpan<byte> remainder = signature.Slice(1);
+                    length = 1 + ReadSingleType(ref remainder).Length;
+                    break;
+                }
+                default:
+                    length = 1;
+                    break;
             }
 
             ReadOnlySpan<byte> rv = signature.Slice(0, length);
@@ -151,9 +150,9 @@ namespace Tmds.DBus.SourceGenerator
         {
             DBusType dbusType = signature.Length == 0 ? DBusType.Invalid : (DBusType)signature[0];
 
-            if (dbusType == DBusType.Array)
+            switch (dbusType)
             {
-                if ((DBusType)signature[1] == DBusType.DictEntry)
+                case DBusType.Array when (DBusType)signature[1] == DBusType.DictEntry:
                 {
                     signature = signature.Slice(2);
                     ReadOnlySpan<byte> keySignature = ReadSingleType(ref signature);
@@ -163,43 +162,48 @@ namespace Tmds.DBus.SourceGenerator
                     T valueType = Transform(valueSignature, map);
                     return map(DBusType.DictEntry, new[] { keyType, valueType });
                 }
-
-                signature = signature.Slice(1);
-                T elementType = Transform(signature, map);
-                signature = signature.Slice(1);
-                return map(DBusType.Array, new[] { elementType });
-            }
-
-            if (dbusType == DBusType.Struct)
-            {
-                signature = signature.Slice(1, signature.Length - 2);
-                int typeCount = CountTypes(signature);
-                T[] innerTypes = new T[typeCount];
-                for (int i = 0; i < innerTypes.Length; i++)
+                case DBusType.Array:
                 {
-                    ReadOnlySpan<byte> innerTypeSignature = ReadSingleType(ref signature);
-                    innerTypes[i] = Transform(innerTypeSignature, map);
+                    signature = signature.Slice(1);
+                    T elementType = Transform(signature, map);
+                    return map(DBusType.Array, new[] { elementType });
                 }
+                case DBusType.Struct:
+                {
+                    signature = signature.Slice(1, signature.Length - 2);
+                    int typeCount = CountTypes(signature);
+                    T[] innerTypes = new T[typeCount];
+                    for (int i = 0; i < innerTypes.Length; i++)
+                    {
+                        ReadOnlySpan<byte> innerTypeSignature = ReadSingleType(ref signature);
+                        innerTypes[i] = Transform(innerTypeSignature, map);
+                    }
 
-                return map(DBusType.Struct, innerTypes);
+                    return map(DBusType.Struct, innerTypes);
+                }
+                default:
+                    return map(dbusType, Array.Empty<T>());
             }
-
-            return map(dbusType, Array.Empty<T>());
         }
 
         // Counts the number of single types in a signature.
-        internal static int CountTypes(ReadOnlySpan<byte> signature)
+        private static int CountTypes(ReadOnlySpan<byte> signature)
         {
-            if (signature.Length == 0) return 0;
-
-            if (signature.Length == 1) return 1;
+            if (signature.Length is 0 or 1)
+                return 0;
 
             DBusType type = (DBusType)signature[0];
             signature = signature.Slice(1);
 
-            if (type == DBusType.Struct)
-                ReadToEnd(ref signature, (byte)'(', (byte)')');
-            else if (type == DBusType.DictEntry) ReadToEnd(ref signature, (byte)'{', (byte)'}');
+            switch (type)
+            {
+                case DBusType.Struct:
+                    ReadToEnd(ref signature, (byte)'(', (byte)')');
+                    break;
+                case DBusType.DictEntry:
+                    ReadToEnd(ref signature, (byte)'{', (byte)'}');
+                    break;
+            }
 
             return (type == DBusType.Array ? 0 : 1) + CountTypes(signature);
 
