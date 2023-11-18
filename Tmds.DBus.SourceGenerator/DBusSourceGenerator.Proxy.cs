@@ -45,7 +45,8 @@ namespace Tmds.DBus.SourceGenerator
 
         private void AddProxyMethods(ref ClassDeclarationSyntax cl, DBusInterface dBusInterface)
         {
-            if (dBusInterface.Methods is null) return;
+            if (dBusInterface.Methods is null)
+                return;
             foreach (DBusMethod dBusMethod in dBusInterface.Methods)
             {
                 DBusArgument[]? inArgs = dBusMethod.Arguments?.Where(static m => m.Direction is null or "in").ToArray();

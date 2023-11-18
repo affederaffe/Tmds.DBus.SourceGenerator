@@ -55,9 +55,7 @@ namespace Tmds.DBus.SourceGenerator
             DBusType type = (DBusType)signature[0];
 
             if (IsBasicType(type))
-            {
                 length = 1;
-            }
             else
             {
                 switch (type)
@@ -68,6 +66,9 @@ namespace Tmds.DBus.SourceGenerator
                     case DBusType.Array when ReadSingleType(signature.Slice(1), out int elementLength) != DBusType.Invalid:
                         type = DBusType.Array;
                         length = elementLength + 1;
+                        break;
+                    case DBusType.Array:
+                        type = DBusType.Invalid;
                         break;
                     case DBusType.Struct:
                         length = DetermineLength(signature.Slice(1), (byte)'(', (byte)')');
@@ -131,11 +132,9 @@ namespace Tmds.DBus.SourceGenerator
                     length = DetermineLength(signature.Slice(1), (byte)'{', (byte)'}');
                     break;
                 case DBusType.Array:
-                {
                     ReadOnlySpan<byte> remainder = signature.Slice(1);
                     length = 1 + ReadSingleType(ref remainder).Length;
                     break;
-                }
                 default:
                     length = 1;
                     break;
@@ -153,7 +152,6 @@ namespace Tmds.DBus.SourceGenerator
             switch (dbusType)
             {
                 case DBusType.Array when (DBusType)signature[1] == DBusType.DictEntry:
-                {
                     signature = signature.Slice(2);
                     ReadOnlySpan<byte> keySignature = ReadSingleType(ref signature);
                     ReadOnlySpan<byte> valueSignature = ReadSingleType(ref signature);
@@ -161,15 +159,12 @@ namespace Tmds.DBus.SourceGenerator
                     T keyType = Transform(keySignature, map);
                     T valueType = Transform(valueSignature, map);
                     return map(DBusType.DictEntry, new[] { keyType, valueType });
-                }
                 case DBusType.Array:
-                {
                     signature = signature.Slice(1);
                     T elementType = Transform(signature, map);
+                    //signature = signature.Slice(1);
                     return map(DBusType.Array, new[] { elementType });
-                }
                 case DBusType.Struct:
-                {
                     signature = signature.Slice(1, signature.Length - 2);
                     int typeCount = CountTypes(signature);
                     T[] innerTypes = new T[typeCount];
@@ -180,7 +175,6 @@ namespace Tmds.DBus.SourceGenerator
                     }
 
                     return map(DBusType.Struct, innerTypes);
-                }
                 default:
                     return map(dbusType, Array.Empty<T>());
             }
@@ -190,20 +184,15 @@ namespace Tmds.DBus.SourceGenerator
         private static int CountTypes(ReadOnlySpan<byte> signature)
         {
             if (signature.Length is 0 or 1)
-                return 0;
+                return signature.Length;
 
             DBusType type = (DBusType)signature[0];
             signature = signature.Slice(1);
 
-            switch (type)
-            {
-                case DBusType.Struct:
-                    ReadToEnd(ref signature, (byte)'(', (byte)')');
-                    break;
-                case DBusType.DictEntry:
-                    ReadToEnd(ref signature, (byte)'{', (byte)'}');
-                    break;
-            }
+            if (type == DBusType.Struct)
+                ReadToEnd(ref signature, (byte)'(', (byte)')');
+            else if (type == DBusType.DictEntry)
+                ReadToEnd(ref signature, (byte)'{', (byte)'}');
 
             return (type == DBusType.Array ? 0 : 1) + CountTypes(signature);
 
