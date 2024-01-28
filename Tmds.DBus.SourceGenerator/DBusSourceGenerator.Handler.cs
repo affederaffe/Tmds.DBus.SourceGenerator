@@ -56,7 +56,7 @@ namespace Tmds.DBus.SourceGenerator
             AddHandlerMethods(ref cl, ref switchStatement, dBusInterface);
             AddHandlerSignals(ref cl, dBusInterface);
             AddHandlerProperties(ref cl, ref switchStatement, dBusInterface);
-            AddHandlerIntrospect(ref switchStatement, dBusInterface);
+            AddHandlerIntrospect(ref cl, ref switchStatement, dBusInterface);
 
             if (dBusInterface.Properties?.Length > 0)
             {
@@ -589,17 +589,25 @@ namespace Tmds.DBus.SourceGenerator
             AddPropertiesClass(ref cl, dBusInterface);
         }
 
-        private void AddHandlerIntrospect(ref SwitchStatementSyntax sw, DBusInterface dBusInterface)
+        private void AddHandlerIntrospect(ref ClassDeclarationSyntax cl, ref SwitchStatementSyntax sw, DBusInterface dBusInterface)
         {
-            XmlSerializer xmlSerializer = new(typeof(DBusNode));
+            XmlSerializer xmlSerializer = new(typeof(DBusInterface));
             using StringWriter stringWriter = new();
             using XmlWriter xmlWriter = XmlWriter.Create(stringWriter, new XmlWriterSettings { OmitXmlDeclaration = true, Indent = true });
-            xmlWriter.WriteRaw("""
-                                    <!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
-                                    "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
-                                    """);
-            xmlSerializer.Serialize(xmlWriter, new DBusNode { Interfaces = new[] { dBusInterface } });
+            xmlSerializer.Serialize(xmlWriter, dBusInterface);
             string introspect = stringWriter.ToString();
+
+            cl = cl.AddMembers(
+                FieldDeclaration(
+                    VariableDeclaration(ParseTypeName("ReadOnlyMemory<byte>"))
+                        .AddVariables(
+                            VariableDeclarator("_introspectXml")
+                                .WithInitializer(
+                                    EqualsValueClause(
+                                        InvocationExpression(
+                                            MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, LiteralExpression(SyntaxKind.Utf8StringLiteralExpression, Utf8Literal(introspect)), IdentifierName("ToArray")))))))
+                    .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword)));
+
             sw = sw.AddSections(
                 SwitchSection()
                     .AddLabels(
@@ -626,30 +634,13 @@ namespace Tmds.DBus.SourceGenerator
                                     .AddStatements(
                                         Block(
                                             ExpressionStatement(
-                                                InvocationExpression(IdentifierName("Reply"))),
-                                            LocalFunctionStatement(PredefinedType(Token(SyntaxKind.VoidKeyword)), Identifier("Reply"))
-                                                .AddBodyStatements(
-                                                    LocalDeclarationStatement(
-                                                        VariableDeclaration(ParseTypeName("MessageWriter"))
-                                                            .AddVariables(
-                                                                VariableDeclarator("writer")
-                                                                    .WithInitializer(
-                                                                        EqualsValueClause(
-                                                                            InvocationExpression(
-                                                                                    MakeMemberAccessExpression("context", "CreateReplyWriter"))
-                                                                                .AddArgumentListArguments(
-                                                                                    Argument(MakeLiteralExpression("s"))))))),
-                                                    ExpressionStatement(
-                                                        InvocationExpression(
-                                                                MakeMemberAccessExpression("writer", GetOrAddWriteMethod(new DBusValue { Type = "s" })))
-                                                            .AddArgumentListArguments(
-                                                                Argument(MakeLiteralExpression(introspect)))),
-                                                    ExpressionStatement(
-                                                        InvocationExpression(
-                                                                MakeMemberAccessExpression("context", "Reply"))
-                                                            .AddArgumentListArguments(
-                                                                Argument(
-                                                                    InvocationExpression(MakeMemberAccessExpression("writer", "CreateMessage")))))),
+                                                InvocationExpression(
+                                                    MakeMemberAccessExpression("context", "ReplyIntrospectXml"))
+                                                    .AddArgumentListArguments(
+                                                        Argument(
+                                                            ImplicitArrayCreationExpression(
+                                                                InitializerExpression(SyntaxKind.ArrayInitializerExpression)
+                                                                    .AddExpressions(IdentifierName("_introspectXml")))))),
                                             BreakStatement()))),
                         BreakStatement()));
         }

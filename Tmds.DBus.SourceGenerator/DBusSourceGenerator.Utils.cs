@@ -74,6 +74,8 @@ namespace Tmds.DBus.SourceGenerator
 
         private static LiteralExpressionSyntax MakeLiteralExpression(int literal) => LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(literal));
 
+        private static SyntaxToken Utf8Literal(string value) => Token(TriviaList(ElasticMarker), SyntaxKind.Utf8StringLiteralToken, SymbolDisplay.FormatLiteral(value, true) + "u8", value, TriviaList(ElasticMarker));
+
         private static string TupleOf(IEnumerable<string> elements) => $"({string.Join(", ", elements)})";
 
         private static ExpressionSyntax MakeGetDBusVariantExpression(DBusValue dBusValue, ExpressionSyntax accessValueExpression) =>

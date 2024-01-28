@@ -18,6 +18,7 @@ namespace Tmds.DBus.SourceGenerator
     [Serializable]
     [DesignerCategory("code")]
     [XmlType(AnonymousType = true)]
+    [XmlRoot(Namespace = "", IsNullable = false, ElementName = "interface")]
     public class DBusInterface
     {
         [XmlAttribute("name")]
