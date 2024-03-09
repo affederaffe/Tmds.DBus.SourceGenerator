@@ -47,6 +47,7 @@ namespace Tmds.DBus.SourceGenerator
         {
             if (dBusInterface.Methods is null)
                 return;
+
             foreach (DBusMethod dBusMethod in dBusInterface.Methods)
             {
                 DBusArgument[]? inArgs = dBusMethod.Arguments?.Where(static m => m.Direction is null or "in").ToArray();
@@ -89,7 +90,9 @@ namespace Tmds.DBus.SourceGenerator
 
         private void AddProxySignals(ref ClassDeclarationSyntax cl, DBusInterface dBusInterface)
         {
-            if (dBusInterface.Signals is null) return;
+            if (dBusInterface.Signals is null)
+                return;
+
             foreach (DBusSignal dBusSignal in dBusInterface.Signals)
             {
                 DBusArgument[]? outArgs = dBusSignal.Arguments?.Where(static x => x.Direction is null or "out").ToArray();
@@ -108,7 +111,10 @@ namespace Tmds.DBus.SourceGenerator
                 parameters = parameters.AddParameters(
                     Parameter(Identifier("emitOnCapturedContext"))
                         .WithType(PredefinedType(Token(SyntaxKind.BoolKeyword)))
-                        .WithDefault(EqualsValueClause(LiteralExpression(SyntaxKind.TrueLiteralExpression))));
+                        .WithDefault(EqualsValueClause(LiteralExpression(SyntaxKind.TrueLiteralExpression))),
+                    Parameter(Identifier("flags"))
+                        .WithType(ParseTypeName("ObserverFlags"))
+                        .WithDefault(EqualsValueClause(MakeMemberAccessExpression("ObserverFlags", "None"))));
 
                 ArgumentListSyntax arguments = ArgumentList()
                     .AddArguments(Argument(IdentifierName("_connection")),
@@ -122,7 +128,8 @@ namespace Tmds.DBus.SourceGenerator
 
                 arguments = arguments.AddArguments(
                     Argument(IdentifierName("handler")),
-                    Argument(IdentifierName("emitOnCapturedContext")));
+                    Argument(IdentifierName("emitOnCapturedContext")),
+                    Argument(IdentifierName("flags")));
 
                 MethodDeclarationSyntax watchSignalMethod = MethodDeclaration(ParseTypeName("ValueTask<IDisposable>"), $"Watch{Pascalize(dBusSignal.Name!)}Async")
                     .AddModifiers(Token(SyntaxKind.PublicKeyword))
@@ -165,7 +172,12 @@ namespace Tmds.DBus.SourceGenerator
                         .WithType(PredefinedType(Token(SyntaxKind.BoolKeyword)))
                         .WithDefault(
                             EqualsValueClause(
-                                LiteralExpression(SyntaxKind.TrueLiteralExpression))))
+                                LiteralExpression(SyntaxKind.TrueLiteralExpression))),
+                    Parameter(Identifier("flags"))
+                        .WithType(ParseTypeName("ObserverFlags"))
+                        .WithDefault(
+                            EqualsValueClause(
+                                MakeMemberAccessExpression("ObserverFlags", "None"))))
                 .WithBody(
                     Block(
                         ReturnStatement(
@@ -178,7 +190,8 @@ namespace Tmds.DBus.SourceGenerator
                                     Argument(IdentifierName("Interface")),
                                     Argument(IdentifierName("ReadMessage")),
                                     Argument(IdentifierName("handler")),
-                                    Argument(IdentifierName("emitOnCapturedContext")))),
+                                    Argument(IdentifierName("emitOnCapturedContext")),
+                                    Argument(IdentifierName("flags")))),
                         LocalFunctionStatement(ParseTypeName("PropertyChanges<Properties>"), "ReadMessage")
                             .AddModifiers(Token(SyntaxKind.StaticKeyword))
                             .AddParameterListParameters(
@@ -227,7 +240,8 @@ namespace Tmds.DBus.SourceGenerator
 
         private void AddProperties(ref ClassDeclarationSyntax cl, DBusInterface dBusInterface)
         {
-            if (dBusInterface.Properties is null || dBusInterface.Properties.Length == 0) return;
+            if (dBusInterface.Properties is null || dBusInterface.Properties.Length == 0)
+                return;
 
             cl = dBusInterface.Properties!.Aggregate(cl, (current, dBusProperty) => dBusProperty.Access switch
             {

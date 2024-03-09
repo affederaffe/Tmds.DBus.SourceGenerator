@@ -66,7 +66,10 @@ namespace Tmds.DBus.SourceGenerator
                         .WithType(ParseTypeName("Action<Exception?>")),
                     Parameter(Identifier("emitOnCapturedContext"))
                         .WithType(PredefinedType(Token(SyntaxKind.BoolKeyword)))
-                        .WithDefault(EqualsValueClause(LiteralExpression(SyntaxKind.TrueLiteralExpression))))
+                        .WithDefault(EqualsValueClause(LiteralExpression(SyntaxKind.TrueLiteralExpression))),
+                    Parameter(Identifier("flags"))
+                        .WithType(IdentifierName("ObserverFlags"))
+                        .WithDefault(EqualsValueClause(MakeMemberAccessExpression("ObserverFlags", "None"))))
                 .WithBody(
                     Block(
                         ReturnStatement(
@@ -107,7 +110,8 @@ namespace Tmds.DBus.SourceGenerator
                                                         Argument(IdentifierName("e"))))),
                                     Argument(LiteralExpression(SyntaxKind.NullLiteralExpression)),
                                     Argument(IdentifierName("handler")),
-                                    Argument(IdentifierName("emitOnCapturedContext"))))));
+                                    Argument(IdentifierName("emitOnCapturedContext")),
+                                    Argument(IdentifierName("flags"))))));
 
             MethodDeclarationSyntax watchSignalWithReadMethod = MethodDeclaration(ParseTypeName("ValueTask<IDisposable>"), "WatchSignalAsync")
                 .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
@@ -124,7 +128,10 @@ namespace Tmds.DBus.SourceGenerator
                         .WithType(ParseTypeName("Action<Exception?, T>")),
                     Parameter(Identifier("emitOnCapturedContext"))
                         .WithType(PredefinedType(Token(SyntaxKind.BoolKeyword)))
-                        .WithDefault(EqualsValueClause(LiteralExpression(SyntaxKind.TrueLiteralExpression))))
+                        .WithDefault(EqualsValueClause(LiteralExpression(SyntaxKind.TrueLiteralExpression))),
+                    Parameter(Identifier("flags"))
+                        .WithType(IdentifierName("ObserverFlags"))
+                        .WithDefault(EqualsValueClause(MakeMemberAccessExpression("ObserverFlags", "None"))))
                 .WithBody(
                     Block(
                         ReturnStatement(
@@ -157,7 +164,8 @@ namespace Tmds.DBus.SourceGenerator
                                                         Argument(IdentifierName("arg"))))),
                                     Argument(LiteralExpression(SyntaxKind.NullLiteralExpression)),
                                     Argument(IdentifierName("handler")),
-                                    Argument(IdentifierName("emitOnCapturedContext"))))));
+                                    Argument(IdentifierName("emitOnCapturedContext")),
+                                    Argument(IdentifierName("flags"))))));
 
             MethodDeclarationSyntax watchPropertiesMethod = MethodDeclaration(ParseTypeName("ValueTask<IDisposable>"), "WatchPropertiesChangedAsync")
                 .AddModifiers(Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.StaticKeyword))
@@ -178,7 +186,10 @@ namespace Tmds.DBus.SourceGenerator
                         .WithType(ParseTypeName("Action<Exception?, PropertyChanges<T>>")),
                     Parameter(Identifier("emitOnCapturedContext"))
                         .WithType(PredefinedType(Token(SyntaxKind.BoolKeyword)))
-                        .WithDefault(EqualsValueClause(LiteralExpression(SyntaxKind.TrueLiteralExpression))))
+                        .WithDefault(EqualsValueClause(LiteralExpression(SyntaxKind.TrueLiteralExpression))),
+                    Parameter(Identifier("flags"))
+                        .WithType(IdentifierName("ObserverFlags"))
+                        .WithDefault(EqualsValueClause(MakeMemberAccessExpression("ObserverFlags", "None"))))
                 .WithBody(
                     Block(
                         LocalDeclarationStatement(
@@ -208,7 +219,8 @@ namespace Tmds.DBus.SourceGenerator
                                     Argument(IdentifierName("rule")),
                                     Argument(IdentifierName("reader")),
                                     Argument(IdentifierName("handler")),
-                                    Argument(IdentifierName("emitOnCapturedContext"))))));
+                                    Argument(IdentifierName("emitOnCapturedContext")),
+                                    Argument(IdentifierName("flags"))))));
 
             return MakeCompilationUnit(
                 NamespaceDeclaration(IdentifierName("Tmds.DBus.SourceGenerator"))
