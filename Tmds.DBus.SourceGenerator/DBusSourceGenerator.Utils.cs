@@ -129,10 +129,7 @@ namespace Tmds.DBus.SourceGenerator
                     ObjectCreationExpression(
                         ParseTypeName("DBusSignatureItem")))
                     .AddArgumentListArguments(Argument(accessValueExpression)),
-                DBusType.Variant => InvocationExpression(
-                    ObjectCreationExpression(
-                        ParseTypeName("DBusVariantItem")))
-                    .AddArgumentListArguments(Argument(accessValueExpression)),
+                DBusType.Variant => accessValueExpression,
                 DBusType.Array => ObjectCreationExpression(
                         ParseTypeName("DBusArrayItem"))
                     .AddArgumentListArguments(
@@ -149,14 +146,27 @@ namespace Tmds.DBus.SourceGenerator
                                                             Identifier("x")))
                                                     .WithExpressionBody(
                                                         MakeGetDBusVariantExpression(dBusValue.InnerDBusTypes![0], IdentifierName("x"))))), IdentifierName("ToArray"))))),
-                DBusType.DictEntry => InvocationExpression(
-                    ObjectCreationExpression(
-                        ParseTypeName("DBusDictEntryItem")))
+                DBusType.DictEntry => ObjectCreationExpression(
+                        ParseTypeName("DBusArrayItem"))
                     .AddArgumentListArguments(
+                        Argument(MakeMemberAccessExpression("DBusType", "DictEntry")),
                         Argument(
-                            MakeGetDBusVariantExpression(dBusValue.InnerDBusTypes![0], MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, accessValueExpression, IdentifierName("Key")))),
-                        Argument(
-                            MakeGetDBusVariantExpression(dBusValue.InnerDBusTypes![1], MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, accessValueExpression, IdentifierName("Value"))))),
+                            InvocationExpression(
+                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
+                                    InvocationExpression(
+                                            MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, accessValueExpression, IdentifierName("Select")))
+                                        .AddArgumentListArguments(
+                                            Argument(
+                                                SimpleLambdaExpression(
+                                                        Parameter(
+                                                            Identifier("x")))
+                                                    .WithExpressionBody(
+                                                        ObjectCreationExpression(
+                                                            ParseTypeName("DBusDictEntryItem"))
+                                                            .AddArgumentListArguments(
+                                                                Argument(MakeGetDBusVariantExpression(dBusValue.InnerDBusTypes![0], MakeMemberAccessExpression("x", "Key"))),
+                                                                Argument(MakeGetDBusVariantExpression(dBusValue.InnerDBusTypes![1], MakeMemberAccessExpression("x", "Value"))))))),
+                                    IdentifierName("ToArray"))))),
                 DBusType.Struct => InvocationExpression(
                         ObjectCreationExpression(
                             ParseTypeName("DBusStructItem")))
