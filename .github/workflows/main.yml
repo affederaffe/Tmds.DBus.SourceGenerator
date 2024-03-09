@@ -12,9 +12,9 @@ jobs:
     env:
       DOTNET_CLI_TELEMETRY_OPTOUT: true
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Setup .NET
-      uses: actions/setup-dotnet@v3
+      uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
     - name: Restore dependencies
@@ -22,7 +22,7 @@ jobs:
     - name: Build
       run: dotnet build -c Release --no-restore
     - name: Upload Artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: Tmds.DBus.SourceGenerator
         path: Tmds.DBus.SourceGenerator/bin/Release/Tmds.DBus.SourceGenerator.*.nupkg
