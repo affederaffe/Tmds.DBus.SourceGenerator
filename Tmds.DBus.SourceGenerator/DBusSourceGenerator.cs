@@ -88,13 +88,14 @@ namespace Tmds.DBus.SourceGenerator
                         ClassDeclaration("WriterExtensions")
                             .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.StaticKeyword))
                             .WithMembers(
-                                List<MemberDeclarationSyntax>(_writeMethodExtensions.Values))));
+                                List<MemberDeclarationSyntax>(_writeMethodExtensions.Values)
+                                    .Add(MakeWriteNullableStringMethod())
+                                    .Add(MakeWriteObjectPathSafeMethod()))));
 
                 productionContext.AddSource("Tmds.DBus.SourceGenerator.PropertyChanges.cs", MakePropertyChangesClass().GetText(Encoding.UTF8));
                 productionContext.AddSource("Tmds.DBus.SourceGenerator.SignalHelper.cs", MakeSignalHelperClass().GetText(Encoding.UTF8));
                 productionContext.AddSource("Tmds.DBus.SourceGenerator.ReaderExtensions.cs", readerExtensions.GetText(Encoding.UTF8));
                 productionContext.AddSource("Tmds.DBus.SourceGenerator.WriterExtensions.cs", writerExtensions.GetText(Encoding.UTF8));
-                productionContext.AddSource("Tmds.DBus.SourceGenerator.VariantExtensions.cs", VariantExtensions);
             });
         }
     }
