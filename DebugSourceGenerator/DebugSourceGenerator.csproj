@@ -22,6 +22,9 @@
         <AdditionalFiles Include="DBusXml/org.freedesktop.portal.FileChooser.xml" DBusGeneratorMode="Proxy" />
         <AdditionalFiles Include="DBusXml/org.freedesktop.portal.Request.xml" DBusGeneratorMode="Proxy" />
         <AdditionalFiles Include="DBusXml/org.freedesktop.portal.Settings.xml" DBusGeneratorMode="Proxy" />
+
+        <AdditionalFiles Include="DBusXml/org.mpris.MediaPlayer2.Player.xml" DBusGeneratorMode="Handler" />
+        <AdditionalFiles Include="DBusXml/org.mpris.MediaPlayer2.xml" DBusGeneratorMode="Handler" />
     
         <AdditionalFiles Include="DBusXml/org.kde.StatusNotifierWatcher.xml" DBusGeneratorMode="Proxy" />
         <AdditionalFiles Include="DBusXml/org.kde.StatusNotifierItem.xml" DBusGeneratorMode="Handler" />
