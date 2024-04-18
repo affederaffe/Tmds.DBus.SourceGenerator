@@ -88,41 +88,38 @@ namespace Tmds.DBus.SourceGenerator
                 DBusArgument[]? inArgs = dBusMethod.Arguments?.Where(static m => m.Direction is null or "in").ToArray();
                 DBusArgument[]? outArgs = dBusMethod.Arguments?.Where(static m => m.Direction == "out").ToArray();
 
-                SwitchSectionSyntax switchSection = SwitchSection();
-
-                if (inArgs?.Length > 0)
-                {
-                    switchSection = switchSection.AddLabels(
-                        CaseSwitchLabel(
-                            TupleExpression()
-                                .AddArguments(
-                                    Argument(MakeLiteralExpression(dBusMethod.Name!)),
-                                    Argument(MakeLiteralExpression(ParseSignature(inArgs)!)))));
-                }
-                else
-                {
-                    switchSection = switchSection.AddLabels(
+                SwitchSectionSyntax switchSection = SwitchSection()
+                    .AddLabels(
                         CasePatternSwitchLabel(
                             RecursivePattern()
                                 .WithPositionalPatternClause(
                                     PositionalPatternClause()
                                         .AddSubpatterns(
                                             Subpattern(
-                                                ConstantPattern(MakeLiteralExpression("Introspect"))),
+                                                ConstantPattern(
+                                                    MakeLiteralExpression(dBusMethod.Name!))),
                                             Subpattern(
-                                                BinaryPattern(SyntaxKind.OrPattern, ConstantPattern(MakeLiteralExpression(string.Empty)),
-                                                    ConstantPattern(LiteralExpression(SyntaxKind.NullLiteralExpression)))))),
+                                                inArgs?.Length > 0
+                                                ? ConstantPattern(
+                                                    MakeLiteralExpression(
+                                                        ParseSignature(inArgs)!))
+                                                : BinaryPattern(SyntaxKind.OrPattern,
+                                                    ConstantPattern(
+                                                        MakeLiteralExpression(string.Empty)),
+                                                    ConstantPattern(
+                                                        LiteralExpression(SyntaxKind.NullLiteralExpression)))))),
                             Token(SyntaxKind.ColonToken)));
-                }
 
                 BlockSyntax switchSectionBlock = Block();
 
                 string abstractMethodName = $"On{Pascalize(dBusMethod.Name!)}Async";
 
-                MethodDeclarationSyntax abstractMethod = MethodDeclaration(ParseValueTaskReturnType(outArgs, AccessMode.Write), abstractMethodName);
+                MethodDeclarationSyntax abstractMethod = MethodDeclaration(
+                    ParseValueTaskReturnType(outArgs, AccessMode.Write), abstractMethodName);
 
                 if (inArgs?.Length > 0)
-                    abstractMethod = abstractMethod.WithParameterList(ParseParameterList(inArgs, AccessMode.Read));
+                    abstractMethod = abstractMethod.WithParameterList(
+                        ParseParameterList(inArgs, AccessMode.Read));
 
                 abstractMethod = abstractMethod
                     .AddModifiers(Token(SyntaxKind.ProtectedKeyword), Token(SyntaxKind.AbstractKeyword))
@@ -164,116 +161,6 @@ namespace Tmds.DBus.SourceGenerator
                         LocalFunctionStatement(
                                 PredefinedType(Token(SyntaxKind.VoidKeyword)), Identifier("ReadParameters"))
                             .WithBody(readParametersMethodBlock));
-
-                    if (outArgs is null || outArgs.Length == 0)
-                    {
-                        switchSectionBlock = switchSectionBlock.AddStatements(
-                            IfStatement(
-                        IsPatternExpression(
-                            IdentifierName("_synchronizationContext"), UnaryPattern(ConstantPattern(LiteralExpression(SyntaxKind.NullLiteralExpression)))),
-                        Block(
-                            LocalDeclarationStatement(
-                                VariableDeclaration(GenericName("TaskCompletionSource")
-                                        .AddTypeArgumentListArguments(
-                                            PredefinedType(Token(SyntaxKind.BoolKeyword))))
-                                    .AddVariables(
-                                        VariableDeclarator("tsc")
-                                            .WithInitializer(
-                                                EqualsValueClause(
-                                                    ImplicitObjectCreationExpression())))),
-                            ExpressionStatement(
-                                InvocationExpression(
-                                    MakeMemberAccessExpression("_synchronizationContext", "Post"))
-                                    .AddArgumentListArguments(
-                                        Argument(
-                                            SimpleLambdaExpression(
-                                                Parameter(
-                                                    Identifier("_")))
-                                                .WithAsyncKeyword(Token(SyntaxKind.AsyncKeyword))
-                                                .WithBlock(
-                                                    Block(
-                                                        TryStatement()
-                                                            .AddBlockStatements(
-                                                                ExpressionStatement(
-                                                                    AwaitExpression(
-                                                                            InvocationExpression(
-                                                                                    IdentifierName(abstractMethodName))
-                                                                                .AddArgumentListArguments(
-                                                                                    inArgs.Select(static (argument, i) =>
-                                                                                        Argument(
-                                                                                            IdentifierName(argument.Name is not null
-                                                                                                ? SanitizeIdentifier(Camelize(argument.Name))
-                                                                                                : $"arg{i}")))
-                                                                                        .ToArray()))),
-                                                                ExpressionStatement(
-                                                                    InvocationExpression(
-                                                                            MakeMemberAccessExpression("tsc", "SetResult"))
-                                                                        .AddArgumentListArguments(
-                                                                            Argument(
-                                                                                LiteralExpression(SyntaxKind.TrueLiteralExpression)))))
-                                                            .AddCatches(
-                                                                CatchClause()
-                                                                    .WithDeclaration(
-                                                                        CatchDeclaration(IdentifierName("Exception"))
-                                                                            .WithIdentifier(Identifier("e")))
-                                                                    .AddBlockStatements(
-                                                                        ExpressionStatement(
-                                                                            InvocationExpression(
-                                                                                    MakeMemberAccessExpression("tsc", "SetException"))
-                                                                                .AddArgumentListArguments(
-                                                                                    Argument(IdentifierName("e"))))))))),
-                                        Argument(
-                                            LiteralExpression(SyntaxKind.NullLiteralExpression)))),
-                            ExpressionStatement(
-                                AwaitExpression(
-                                    MakeMemberAccessExpression("tsc", "Task")))),
-                        ElseClause(
-                            Block(
-                            ExpressionStatement(
-                                AwaitExpression(
-                                    InvocationExpression(
-                                            IdentifierName(abstractMethodName))
-                                        .AddArgumentListArguments(
-                                            inArgs.Select(static (argument, i) =>
-                                                Argument(
-                                                    IdentifierName(argument.Name is not null
-                                                        ? SanitizeIdentifier(Camelize(argument.Name))
-                                                        : $"arg{i}")))
-                                                .ToArray())))))));
-
-                        BlockSyntax replyMethodBlock = Block(
-                            LocalDeclarationStatement(
-                                VariableDeclaration(IdentifierName("MessageWriter"))
-                                    .AddVariables(
-                                        VariableDeclarator("writer")
-                                            .WithInitializer(
-                                                EqualsValueClause(
-                                                    InvocationExpression(
-                                                            MakeMemberAccessExpression("context", "CreateReplyWriter"))
-                                                        .AddArgumentListArguments(
-                                                            Argument(
-                                                                PostfixUnaryExpression(SyntaxKind.SuppressNullableWarningExpression, LiteralExpression(SyntaxKind.NullLiteralExpression)))))))),
-                            ExpressionStatement(
-                                InvocationExpression(
-                                        MakeMemberAccessExpression("context", "Reply"))
-                                    .AddArgumentListArguments(
-                                        Argument(
-                                            InvocationExpression(
-                                                MakeMemberAccessExpression("writer", "CreateMessage"))))),
-                            ExpressionStatement(
-                                InvocationExpression(
-                                    MakeMemberAccessExpression("writer", "Dispose"))));
-
-                        switchSectionBlock = switchSectionBlock.AddStatements(
-                            IfStatement(
-                                PrefixUnaryExpression(SyntaxKind.LogicalNotExpression, MakeMemberAccessExpression("context", "NoReplyExpected")),
-                                ExpressionStatement(
-                                    InvocationExpression(
-                                        IdentifierName("Reply")))),
-                            LocalFunctionStatement(
-                                    PredefinedType(Token(SyntaxKind.VoidKeyword)), Identifier("Reply"))
-                                .WithBody(replyMethodBlock));
-                    }
                 }
 
                 if (outArgs?.Length > 0)
@@ -282,16 +169,28 @@ namespace Tmds.DBus.SourceGenerator
                         LocalDeclarationStatement(
                             VariableDeclaration(ParseReturnType(outArgs, AccessMode.Write)!)
                                 .AddVariables(
-                                    VariableDeclarator("ret"))),
+                                    VariableDeclarator("ret"))));
+                }
+
+                ExpressionSyntax callAbstractMethod = AwaitExpression(
+                    InvocationExpression(
+                            IdentifierName(abstractMethodName))
+                        .AddArgumentListArguments(
+                            inArgs?.Select(static (argument, i) =>
+                                    Argument(
+                                        IdentifierName(argument.Name is not null
+                                            ? SanitizeIdentifier(Camelize(argument.Name))
+                                            : $"arg{i}")))
+                                .ToArray() ?? []));
+
+                switchSectionBlock = switchSectionBlock.AddStatements(
                         IfStatement(
                         IsPatternExpression(
                             IdentifierName("_synchronizationContext"), UnaryPattern(ConstantPattern(LiteralExpression(SyntaxKind.NullLiteralExpression)))),
                         Block(
                             LocalDeclarationStatement(
                                 VariableDeclaration(
-                                        GenericName("TaskCompletionSource")
-                                            .AddTypeArgumentListArguments(
-                                                ParseReturnType(outArgs, AccessMode.Write)!))
+                                        ParseTaskCompletionSourceType(outArgs, AccessMode.Write))
                                     .AddVariables(
                                         VariableDeclarator("tsc")
                                             .WithInitializer(
@@ -310,31 +209,27 @@ namespace Tmds.DBus.SourceGenerator
                                                     Block(
                                                         TryStatement()
                                                             .AddBlockStatements(
-                                                                LocalDeclarationStatement(
+                                                                outArgs?.Length > 0
+                                                                    ? LocalDeclarationStatement(
                                                                     VariableDeclaration(
                                                                             ParseReturnType(outArgs, AccessMode.Write)!)
                                                                         .AddVariables(
                                                                             VariableDeclarator("ret1")
                                                                                 .WithInitializer(
-                                                                                    EqualsValueClause(
-                                                                                        AwaitExpression(
-                                                                                            InvocationExpression(
-                                                                                                    IdentifierName(abstractMethodName))
-                                                                                                .AddArgumentListArguments(
-                                                                                                    inArgs?.Select(static (argument, i) =>
-                                                                                                        Argument(
-                                                                                                            IdentifierName(argument.Name is not null
-                                                                                                                ? SanitizeIdentifier(Camelize(argument.Name))
-                                                                                                                : $"arg{i}")))
-                                                                                                        .ToArray() ?? [])))))),
+                                                                                    EqualsValueClause(callAbstractMethod))))
+                                                                    : ExpressionStatement(callAbstractMethod),
                                                                 ExpressionStatement(
                                                                     InvocationExpression(
                                                                             MakeMemberAccessExpression("tsc", "SetResult"))
                                                                         .AddArgumentListArguments(
-                                                                            Argument(IdentifierName("ret1")))))
+                                                                            Argument(
+                                                                                outArgs?.Length > 0
+                                                                                    ? IdentifierName("ret1")
+                                                                                    : LiteralExpression(SyntaxKind.TrueLiteralExpression)))))
                                                             .AddCatches(
                                                                 CatchClause()
-                                                                    .WithDeclaration(CatchDeclaration(IdentifierName("Exception"))
+                                                                    .WithDeclaration(
+                                                                        CatchDeclaration(IdentifierName("Exception"))
                                                                         .WithIdentifier(Identifier("e")))
                                                                     .WithBlock(
                                                                         Block(
@@ -346,21 +241,19 @@ namespace Tmds.DBus.SourceGenerator
                                         Argument(
                                             LiteralExpression(SyntaxKind.NullLiteralExpression)))),
                             ExpressionStatement(
-                                MakeAssignmentExpression(IdentifierName("ret"), AwaitExpression(
-                                    MakeMemberAccessExpression("tsc", "Task"))))),
+                                outArgs?.Length > 0
+                                    ? MakeAssignmentExpression(
+                                        IdentifierName("ret"), AwaitExpression(
+                                            MakeMemberAccessExpression("tsc", "Task")))
+                                    : AwaitExpression(
+                                        MakeMemberAccessExpression("tsc", "Task")))),
                         ElseClause(
                             Block(
                             ExpressionStatement(
-                                MakeAssignmentExpression(IdentifierName("ret"), AwaitExpression(
-                                    InvocationExpression(
-                                            IdentifierName(abstractMethodName))
-                                        .AddArgumentListArguments(
-                                            inArgs?.Select(static (argument, i) =>
-                                                Argument(
-                                                    IdentifierName(argument.Name is not null
-                                                        ? SanitizeIdentifier(Camelize(argument.Name))
-                                                        : $"arg{i}")))
-                                                .ToArray() ?? []))))))));
+                                outArgs?.Length > 0
+                                    ? MakeAssignmentExpression(
+                                        IdentifierName("ret"), callAbstractMethod)
+                                    : callAbstractMethod)))));
 
                     BlockSyntax replyMethodBlock = Block(
                         LocalDeclarationStatement(
@@ -372,9 +265,13 @@ namespace Tmds.DBus.SourceGenerator
                                                     InvocationExpression(
                                                             MakeMemberAccessExpression("context", "CreateReplyWriter"))
                                                         .AddArgumentListArguments(
-                                                            Argument(MakeLiteralExpression(ParseSignature(outArgs)!))))))));
+                                                            Argument(
+                                                                outArgs?.Length > 0
+                                                                    ? MakeLiteralExpression(
+                                                                        ParseSignature(outArgs)!)
+                                                                    : LiteralExpression(SyntaxKind.NullLiteralExpression))))))));
 
-                    if (outArgs.Length == 1)
+                    if (outArgs?.Length == 1)
                     {
                         replyMethodBlock = replyMethodBlock.AddStatements(
                             ExpressionStatement(
@@ -384,7 +281,7 @@ namespace Tmds.DBus.SourceGenerator
                                         Argument(
                                             IdentifierName("ret")))));
                     }
-                    else
+                    else if (outArgs?.Length > 1)
                     {
                         for (int i = 0; i < outArgs.Length; i++)
                         {
@@ -413,13 +310,14 @@ namespace Tmds.DBus.SourceGenerator
                                 MakeMemberAccessExpression("writer", "Dispose"))));
 
                     switchSectionBlock = switchSectionBlock.AddStatements(
-                        ExpressionStatement(
-                            InvocationExpression(
-                                IdentifierName("Reply"))),
+                        IfStatement(
+                            PrefixUnaryExpression(SyntaxKind.LogicalNotExpression, MakeMemberAccessExpression("context", "NoReplyExpected")),
+                            ExpressionStatement(
+                                InvocationExpression(
+                                    IdentifierName("Reply")))),
                         LocalFunctionStatement(
                                 PredefinedType(Token(SyntaxKind.VoidKeyword)), Identifier("Reply"))
                             .WithBody(replyMethodBlock));
-                }
 
                 switchSectionBlock = switchSectionBlock.AddStatements(BreakStatement());
 
@@ -430,7 +328,8 @@ namespace Tmds.DBus.SourceGenerator
             sw = sw.AddSections(
                 SwitchSection()
                     .AddLabels(
-                        CaseSwitchLabel(MakeLiteralExpression(dBusInterface.Name!)))
+                        CaseSwitchLabel(
+                            MakeLiteralExpression(dBusInterface.Name!)))
                     .AddStatements(
                         SwitchStatement(
                                 TupleExpression()
@@ -657,9 +556,14 @@ namespace Tmds.DBus.SourceGenerator
                                                     PositionalPatternClause()
                                                         .AddSubpatterns(
                                                             Subpattern(
-                                                                ConstantPattern(MakeLiteralExpression("Introspect"))),
+                                                                ConstantPattern(
+                                                                    MakeLiteralExpression("Introspect"))),
                                                             Subpattern(
-                                                                BinaryPattern(SyntaxKind.OrPattern, ConstantPattern(MakeLiteralExpression(string.Empty)), ConstantPattern(LiteralExpression(SyntaxKind.NullLiteralExpression)))))),
+                                                                BinaryPattern(SyntaxKind.OrPattern,
+                                                                    ConstantPattern(
+                                                                        MakeLiteralExpression(string.Empty)),
+                                                                    ConstantPattern(
+                                                                        LiteralExpression(SyntaxKind.NullLiteralExpression)))))),
                                             Token(SyntaxKind.ColonToken)))
                                     .AddStatements(
                                         Block(

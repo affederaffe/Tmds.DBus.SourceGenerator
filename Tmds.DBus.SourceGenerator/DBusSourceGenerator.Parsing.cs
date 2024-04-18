@@ -88,9 +88,6 @@ namespace Tmds.DBus.SourceGenerator
         private static TypeSyntax ParseTaskReturnType(IReadOnlyList<DBusValue>? dBusValues, AccessMode accessMode) => dBusValues?.Count switch
         {
             0 or null => IdentifierName("Task"),
-            1 => GenericName("Task")
-                .AddTypeArgumentListArguments(
-                    ParseReturnType(dBusValues, accessMode)!),
             _ => GenericName("Task")
                 .AddTypeArgumentListArguments(
                     ParseReturnType(dBusValues, accessMode)!)
@@ -99,10 +96,18 @@ namespace Tmds.DBus.SourceGenerator
         private static TypeSyntax ParseValueTaskReturnType(IReadOnlyList<DBusValue>? dBusValues, AccessMode accessMode) => dBusValues?.Count switch
         {
             0 or null => IdentifierName("ValueTask"),
-            1 => GenericName("ValueTask")
-                .AddTypeArgumentListArguments(
-                    ParseReturnType(dBusValues, accessMode)!),
             _ => GenericName("ValueTask")
+                .AddTypeArgumentListArguments(
+                    ParseReturnType(dBusValues, accessMode)!)
+        };
+
+        private static TypeSyntax ParseTaskCompletionSourceType(IReadOnlyList<DBusValue>? dBusValues, AccessMode accessMode) => dBusValues?.Count switch
+        {
+            0 or null => GenericName("TaskCompletionSource")
+                .AddTypeArgumentListArguments(
+                    PredefinedType(
+                        Token(SyntaxKind.BoolKeyword))),
+            _ => GenericName("TaskCompletionSource")
                 .AddTypeArgumentListArguments(
                     ParseReturnType(dBusValues, accessMode)!)
         };
