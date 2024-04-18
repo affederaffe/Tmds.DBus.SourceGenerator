@@ -28,7 +28,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Tmds.DBus.Protocol" Version="0.16.1-482-1efa047b2a7d4a0d1cbf60aba099d2fa2eccf819" />
+        <PackageReference Include="Tmds.DBus.Protocol" Version="0.17.0" />
         <ProjectReference Include="../Tmds.DBus.SourceGenerator/Tmds.DBus.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     </ItemGroup>
 
