@@ -21,6 +21,7 @@
         <AdditionalFiles Include="DBusXml/org.freedesktop.IBus.Portal.xml" DBusGeneratorMode="Proxy" />
         <AdditionalFiles Include="DBusXml/org.freedesktop.portal.FileChooser.xml" DBusGeneratorMode="Proxy" />
         <AdditionalFiles Include="DBusXml/org.freedesktop.portal.Request.xml" DBusGeneratorMode="Proxy" />
+        <AdditionalFiles Include="DBusXml/org.freedesktop.portal.ScreenCast.xml" DBusGeneratorMode="Proxy" />
         <AdditionalFiles Include="DBusXml/org.freedesktop.portal.Settings.xml" DBusGeneratorMode="Proxy" />
 
         <AdditionalFiles Include="DBusXml/org.mpris.MediaPlayer2.Player.xml" DBusGeneratorMode="Handler" />
@@ -31,7 +32,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Tmds.DBus.Protocol" Version="0.17.0" />
+        <PackageReference Include="Tmds.DBus.Protocol" Version="0.18.0" />
         <ProjectReference Include="../Tmds.DBus.SourceGenerator/Tmds.DBus.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     </ItemGroup>
 
