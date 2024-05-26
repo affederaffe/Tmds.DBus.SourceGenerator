@@ -194,9 +194,10 @@ namespace Tmds.DBus.SourceGenerator
                 case DBusType.Variant when accessMode == AccessMode.Write:
                     return IdentifierName("Variant");
                 case DBusType.UnixFd:
-                    return IdentifierName("SafeHandle");
+                    return IdentifierName("CloseSafeHandle");
                 case DBusType.Array:
-                    TypeSyntax arr = ArrayType(GetDotnetType(dBusValue.InnerDBusTypes![0], accessMode, nullable))
+                    TypeSyntax arr = ArrayType(
+                            GetDotnetType(dBusValue.InnerDBusTypes![0], accessMode, nullable))
                         .AddRankSpecifiers(ArrayRankSpecifier()
                             .AddSizes(OmittedArraySizeExpression()));
                     if (nullable)
@@ -212,7 +213,8 @@ namespace Tmds.DBus.SourceGenerator
                     return dict;
                 case DBusType.Struct when dBusValue.InnerDBusTypes!.Length == 1:
                     return GenericName("ValueTuple")
-                        .AddTypeArgumentListArguments(GetDotnetType(dBusValue.InnerDBusTypes![0], accessMode, nullable));
+                        .AddTypeArgumentListArguments(
+                            GetDotnetType(dBusValue.InnerDBusTypes![0], accessMode, nullable));
                 case DBusType.Struct:
                     return TupleType()
                         .AddElements(dBusValue.InnerDBusTypes!.Select(dbusType => TupleElement(

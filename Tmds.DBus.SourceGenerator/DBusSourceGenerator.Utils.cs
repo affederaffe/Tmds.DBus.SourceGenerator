@@ -114,7 +114,7 @@ namespace Tmds.DBus.SourceGenerator
                 DBusType.String => "ReadString",
                 DBusType.ObjectPath => "ReadObjectPath",
                 DBusType.Signature => "ReadSignature",
-                DBusType.UnixFd => "ReadHandle",
+                DBusType.UnixFd => "ReadHandle<CloseSafeHandle>",
                 DBusType.Variant => "ReadVariantValue",
                 DBusType.Array => GetOrAddReadArrayMethod(dBusValue),
                 DBusType.DictEntry => GetOrAddReadDictionaryMethod(dBusValue),
