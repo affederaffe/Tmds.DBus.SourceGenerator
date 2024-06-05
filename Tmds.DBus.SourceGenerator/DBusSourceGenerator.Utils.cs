@@ -22,6 +22,7 @@ namespace Tmds.DBus.SourceGenerator
                     UsingDirective(IdentifierName("System.Runtime.InteropServices")),
                     UsingDirective(IdentifierName("System.Threading")),
                     UsingDirective(IdentifierName("System.Threading.Tasks")),
+                    UsingDirective(IdentifierName("Microsoft.Win32.SafeHandles")),
                     UsingDirective(IdentifierName("Tmds.DBus.Protocol")))
                 .AddMembers(namespaceDeclaration
                     .WithLeadingTrivia(
@@ -114,7 +115,7 @@ namespace Tmds.DBus.SourceGenerator
                 DBusType.String => "ReadString",
                 DBusType.ObjectPath => "ReadObjectPath",
                 DBusType.Signature => "ReadSignature",
-                DBusType.UnixFd => "ReadHandle<CloseSafeHandle>",
+                DBusType.UnixFd => "ReadHandle<SafeFileHandle>",
                 DBusType.Variant => "ReadVariantValue",
                 DBusType.Array => GetOrAddReadArrayMethod(dBusValue),
                 DBusType.DictEntry => GetOrAddReadDictionaryMethod(dBusValue),

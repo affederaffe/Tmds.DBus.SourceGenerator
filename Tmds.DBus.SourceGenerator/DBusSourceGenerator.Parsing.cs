@@ -194,7 +194,7 @@ namespace Tmds.DBus.SourceGenerator
                 case DBusType.Variant when accessMode == AccessMode.Write:
                     return IdentifierName("Variant");
                 case DBusType.UnixFd:
-                    return IdentifierName("CloseSafeHandle");
+                    return IdentifierName("SafeFileHandle");
                 case DBusType.Array:
                     TypeSyntax arr = ArrayType(
                             GetDotnetType(dBusValue.InnerDBusTypes![0], accessMode, nullable))
