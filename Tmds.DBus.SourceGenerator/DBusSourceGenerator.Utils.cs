@@ -254,13 +254,19 @@ namespace Tmds.DBus.SourceGenerator
                                     InvocationExpression(
                                         MakeMemberAccessExpression("reader", "AlignStruct"))),
                                 ReturnStatement(
-                                    InvocationExpression(
-                                        MakeMemberAccessExpression("ValueTuple", "Create"))
-                                        .AddArgumentListArguments(
-                                            dBusValue.InnerDBusTypes!.Select(
-                                                x => Argument(
+                                    dBusValue.InnerDBusTypes!.Length == 1
+                                        ? ObjectCreationExpression(
+                                            GetDotnetType(dBusValue, AccessMode.Read))
+                                            .AddArgumentListArguments(
+                                                Argument(
                                                     InvocationExpression(
-                                                        MakeMemberAccessExpression("reader", GetOrAddReadMethod(x))))).ToArray())))));
+                                                        MakeMemberAccessExpression("reader", GetOrAddReadMethod(dBusValue.InnerDBusTypes![0])))))
+                                        : TupleExpression()
+                                            .AddArguments(
+                                                dBusValue.InnerDBusTypes!.Select(innerDBusValue => Argument(
+                                                        InvocationExpression(
+                                                            MakeMemberAccessExpression("reader", GetOrAddReadMethod(innerDBusValue)))))
+                                                    .ToArray())))));
 
             return identifier;
         }

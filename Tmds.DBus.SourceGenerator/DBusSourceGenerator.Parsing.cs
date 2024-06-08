@@ -217,9 +217,11 @@ namespace Tmds.DBus.SourceGenerator
                             GetDotnetType(dBusValue.InnerDBusTypes![0], accessMode, nullable));
                 case DBusType.Struct:
                     return TupleType()
-                        .AddElements(dBusValue.InnerDBusTypes!.Select(dbusType => TupleElement(
-                            GetDotnetType(dbusType, accessMode, nullable)))
-                            .ToArray());
+                        .AddElements(
+                            dBusValue.InnerDBusTypes!.Select(
+                                    dbusType => TupleElement(
+                                        GetDotnetType(dbusType, accessMode, nullable)))
+                                .ToArray());
                 default:
                     throw new ArgumentOutOfRangeException(nameof(dBusValue.DBusType), dBusValue.DBusType,
                         $"Cannot parse DBusType with value {dBusValue.DBusType}");
