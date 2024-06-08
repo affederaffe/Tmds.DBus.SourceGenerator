@@ -100,10 +100,10 @@ namespace Tmds.DBus.SourceGenerator
                                     .Add(MakeWriteNullableStringMethod())
                                     .Add(MakeWriteObjectPathSafeMethod()))));
 
-                productionContext.AddSource("Tmds.DBus.SourceGenerator.PropertyChanges.cs", _propertyChangesClass);
-                productionContext.AddSource("Tmds.DBus.SourceGenerator.SignalHelper.cs", _signalHelperClass);
-                productionContext.AddSource("Tmds.DBus.SourceGenerator.PathHandler.cs", _pathHandlerClass);
-                productionContext.AddSource("Tmds.DBus.SourceGenerator.IDBusInterfaceHandler.cs", _dBusInterfaceHandlerInterface);
+                productionContext.AddSource("Tmds.DBus.SourceGenerator.PropertyChanges.cs", PropertyChangesClass);
+                productionContext.AddSource("Tmds.DBus.SourceGenerator.SignalHelper.cs", SignalHelperClass);
+                productionContext.AddSource("Tmds.DBus.SourceGenerator.PathHandler.cs", PathHandlerClass);
+                productionContext.AddSource("Tmds.DBus.SourceGenerator.IDBusInterfaceHandler.cs", DBusInterfaceHandlerInterface);
                 productionContext.AddSource("Tmds.DBus.SourceGenerator.ReaderExtensions.cs", readerExtensions.GetText(Encoding.UTF8));
                 productionContext.AddSource("Tmds.DBus.SourceGenerator.WriterExtensions.cs", writerExtensions.GetText(Encoding.UTF8));
             });
