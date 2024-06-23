@@ -79,9 +79,13 @@ namespace Tmds.DBus.SourceGenerator
             1 => GetDotnetType(dBusValues[0], accessMode),
             _ => TupleType()
                 .AddElements(
-                    dBusValues.Select((dBusValue, i) => TupleElement(GetDotnetType(dBusValue, accessMode))
+                    dBusValues.Select((dBusValue, i) => TupleElement(
+                                GetDotnetType(dBusValue, accessMode))
                             .WithIdentifier(
-                                Identifier(dBusValue.Name is not null ? SanitizeIdentifier(Pascalize(dBusValue.Name)) : $"Item{i + 1}")))
+                                Identifier(dBusValue.Name is not null
+                                    ? SanitizeIdentifier(
+                                        Pascalize(dBusValue.Name))
+                                    : $"Item{i + 1}")))
                         .ToArray())
         };
 
@@ -115,7 +119,13 @@ namespace Tmds.DBus.SourceGenerator
         private static ParameterListSyntax ParseParameterList(IEnumerable<DBusValue> inArgs, AccessMode accessMode) => ParameterList(
             SeparatedList(
                 inArgs.Select((x, i) =>
-                    Parameter(Identifier(x.Name is not null ? SanitizeIdentifier(Camelize(x.Name)) : $"arg{i}")).WithType(GetDotnetType(x, accessMode)))));
+                    Parameter(
+                        Identifier(x.Name is not null
+                            ? SanitizeIdentifier(
+                                Camelize(x.Name))
+                            : $"arg{i}"))
+                        .WithType(
+                            GetDotnetType(x, accessMode)))));
 
         private static string SanitizeSignature(string signature) =>
             signature.Replace('{', 'e')

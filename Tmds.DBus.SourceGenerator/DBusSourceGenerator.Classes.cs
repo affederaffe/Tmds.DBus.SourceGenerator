@@ -147,7 +147,9 @@ namespace Tmds.DBus.SourceGenerator
                                                                       void ReplyGetProperty(string name, MethodContext context);
                                                               
                                                                       void ReplyGetAllProperties(MethodContext context);
-                                                              
+                                                                      
+                                                                      void SetProperty(string name, ref Reader reader);
+                                                                      
                                                                       ValueTask ReplyInterfaceRequest(MethodContext context);
                                                                   }
                                                               }
@@ -218,6 +220,27 @@ namespace Tmds.DBus.SourceGenerator
                                                                                  handler.ReplyGetAllProperties(context);
                                                                              }
                                                  
+                                                                             break;
+                                                                         }
+                                                                         case ("Set", "ssv"):
+                                                                         {
+                                                                             Reply();
+                                                                             void Reply()
+                                                                             {
+                                                                                 Reader reader = context.Request.GetBodyReader();
+                                                                                 string @interface = reader.ReadString();
+                                                                                 IDBusInterfaceHandler? handler = _dbusInterfaces.FirstOrDefault(x => x.InterfaceName == @interface);
+                                                                                 if (handler is null)
+                                                                                     return;
+                                                                                 string member = reader.ReadString();
+                                                                                 handler.SetProperty(member, ref reader);
+                                                                                 if (!context.NoReplyExpected)
+                                                                                 {
+                                                                                     using MessageWriter writer = context.CreateReplyWriter(null);
+                                                                                     context.Reply(writer.CreateMessage());
+                                                                                 }
+                                                                             }
+                                                                             
                                                                              break;
                                                                          }
                                                                      }
