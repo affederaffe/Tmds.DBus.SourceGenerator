@@ -249,11 +249,12 @@ namespace Tmds.DBus.SourceGenerator
                                                                  case "org.freedesktop.DBus.Introspectable":
                                                                      context.ReplyIntrospectXml(_dbusInterfaces.Select(static x => x.IntrospectXml).ToArray());
                                                                      break;
+                                                                 default:
+                                                                    IDBusInterfaceHandler? handler = _dbusInterfaces.FirstOrDefault(x => x.InterfaceName == context.Request.InterfaceAsString);
+                                                                        if (handler is not null)
+                                                                            await handler.ReplyInterfaceRequest(context);
+                                                                    break;
                                                              }
-                                                 
-                                                             IDBusInterfaceHandler? handler = _dbusInterfaces.FirstOrDefault(x => x.InterfaceName == context.Request.InterfaceAsString);
-                                                             if (handler is not null)
-                                                                 await handler.ReplyInterfaceRequest(context);
                                                          }
                                                  
                                                          /// <inheritdoc />
