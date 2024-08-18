@@ -397,6 +397,51 @@ namespace Tmds.DBus.SourceGenerator
             return identifier;
         }
 
+        private string GetOrAddWriteVariantMethod(DBusValue dBusValue)
+        {
+            string identifier = $"WriteVariant_{SanitizeSignature(ParseSignature(dBusValue.InnerDBusTypes!)!)}";
+            if (_writeMethodExtensions.ContainsKey(identifier))
+                return identifier;
+
+            _writeMethodExtensions.Add(identifier,
+                MethodDeclaration(
+                    PredefinedType(Token(SyntaxKind.VoidKeyword)), identifier)
+                    .AddModifiers(
+                        Token(SyntaxKind.PublicKeyword),
+                        Token(SyntaxKind.StaticKeyword))
+                    .AddParameterListParameters(
+                        Parameter(
+                                Identifier("writer"))
+                            .WithType(
+                                IdentifierName("MessageWriter"))
+                            .AddModifiers(
+                                Token(SyntaxKind.ThisKeyword),
+                                Token(SyntaxKind.RefKeyword)),
+                        Parameter(
+                                Identifier("value"))
+                            .WithType(
+                                GetDotnetType(dBusValue, AccessMode.Write)))
+                    .WithBody(
+                        Block(
+                                SingletonList(
+                                    ExpressionStatement(
+                                        InvocationExpression(
+                                                MakeMemberAccessExpression("writer", "WriteSignature"))
+                                            .AddArgumentListArguments(
+                                                Argument(
+                                                    MakeLiteralExpression(dBusValue.Type!))))))
+                            .AddStatements(
+                                dBusValue.InnerDBusTypes!.Select(StatementSyntax (inner, i) => ExpressionStatement(
+                                        InvocationExpression(
+                                                MakeMemberAccessExpression("writer", GetOrAddWriteMethod(inner)))
+                                            .AddArgumentListArguments(
+                                                Argument(
+                                                    MakeMemberAccessExpression("value", inner.Name ?? $"Item{i + 1}")))))
+                                    .ToArray())));
+
+            return identifier;
+        }
+
         private string GetOrAddWriteArrayMethod(DBusValue dBusValue)
         {
             string identifier = $"WriteArray_{SanitizeSignature(dBusValue.Type!)}";

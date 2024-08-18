@@ -322,7 +322,7 @@ namespace Tmds.DBus.SourceGenerator
                     MakeCallMethodReturnBody(args, createMessageBody));
         }
 
-        private static MethodDeclarationSyntax MakeSetMethod(DBusProperty dBusProperty)
+        private MethodDeclarationSyntax MakeSetMethod(DBusProperty dBusProperty)
         {
             BlockSyntax createMessageBody = MakeCreateMessageBody(MakeLiteralExpression("org.freedesktop.DBus.Properties"), "Set", "ssv",
                 ExpressionStatement(
@@ -335,7 +335,7 @@ namespace Tmds.DBus.SourceGenerator
                         .AddArgumentListArguments(Argument(MakeLiteralExpression(Pascalize(dBusProperty.Name!))))),
                 ExpressionStatement(
                     InvocationExpression(
-                            MakeMemberAccessExpression("writer", "WriteVariant"))
+                            MakeMemberAccessExpression("writer", GetOrAddWriteVariantMethod(dBusProperty)))
                         .AddArgumentListArguments(Argument(IdentifierName("value")))));
 
             ArgumentListSyntax args = ArgumentList(
