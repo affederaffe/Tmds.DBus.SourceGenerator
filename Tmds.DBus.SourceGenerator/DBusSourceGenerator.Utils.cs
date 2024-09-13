@@ -399,7 +399,7 @@ namespace Tmds.DBus.SourceGenerator
 
         private string GetOrAddWriteVariantMethod(DBusValue dBusValue)
         {
-            string identifier = $"WriteVariant_{SanitizeSignature(ParseSignature(dBusValue.InnerDBusTypes!)!)}";
+            string identifier = $"WriteVariant_{SanitizeSignature(dBusValue.Type!)}";
             if (_writeMethodExtensions.ContainsKey(identifier))
                 return identifier;
 
