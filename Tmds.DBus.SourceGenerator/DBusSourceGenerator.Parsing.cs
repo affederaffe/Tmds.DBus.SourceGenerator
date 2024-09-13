@@ -116,16 +116,15 @@ namespace Tmds.DBus.SourceGenerator
                     ParseReturnType(dBusValues, accessMode)!)
         };
 
-        private static ParameterListSyntax ParseParameterList(IEnumerable<DBusValue> inArgs, AccessMode accessMode) => ParameterList(
-            SeparatedList(
-                inArgs.Select((x, i) =>
-                    Parameter(
+        private static ParameterSyntax[] ParseParameterList(IEnumerable<DBusValue> inArgs, AccessMode accessMode) => inArgs.Select((x, i) =>
+                Parameter(
                         Identifier(x.Name is not null
                             ? SanitizeIdentifier(
                                 Camelize(x.Name))
                             : $"arg{i}"))
-                        .WithType(
-                            GetDotnetType(x, accessMode)))));
+                    .WithType(
+                        GetDotnetType(x, accessMode)))
+            .ToArray();
 
         private static string SanitizeSignature(string signature) =>
             signature.Replace('{', 'e')

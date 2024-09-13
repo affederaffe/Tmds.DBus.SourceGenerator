@@ -405,7 +405,7 @@ namespace Tmds.DBus.SourceGenerator
 
             _writeMethodExtensions.Add(identifier,
                 MethodDeclaration(
-                    PredefinedType(Token(SyntaxKind.VoidKeyword)), identifier)
+                        PredefinedType(Token(SyntaxKind.VoidKeyword)), identifier)
                     .AddModifiers(
                         Token(SyntaxKind.PublicKeyword),
                         Token(SyntaxKind.StaticKeyword))
@@ -431,13 +431,14 @@ namespace Tmds.DBus.SourceGenerator
                                                 Argument(
                                                     MakeLiteralExpression(dBusValue.Type!))))))
                             .AddStatements(
-                                dBusValue.InnerDBusTypes!.Select(StatementSyntax (inner, i) => ExpressionStatement(
-                                        InvocationExpression(
-                                                MakeMemberAccessExpression("writer", GetOrAddWriteMethod(inner)))
-                                            .AddArgumentListArguments(
-                                                Argument(
-                                                    MakeMemberAccessExpression("value", inner.Name ?? $"Item{i + 1}")))))
-                                    .ToArray())));
+                                ExpressionStatement(
+                                    InvocationExpression(
+                                        MakeMemberAccessExpression("writer", GetOrAddWriteMethod(dBusValue)))
+                                        .WithArgumentList(
+                                            ArgumentList(
+                                                SingletonSeparatedList(
+                                                    Argument(
+                                                        IdentifierName("value")))))))));
 
             return identifier;
         }

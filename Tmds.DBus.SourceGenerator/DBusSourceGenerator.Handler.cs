@@ -117,18 +117,25 @@ namespace Tmds.DBus.SourceGenerator
                 string abstractMethodName = $"On{Pascalize(dBusMethod.Name!)}Async";
 
                 MethodDeclarationSyntax abstractMethod = MethodDeclaration(
-                    ParseValueTaskReturnType(outArgs, AccessMode.Write), abstractMethodName);
-
-                if (inArgs?.Length > 0)
-                    abstractMethod = abstractMethod.WithParameterList(
-                        ParseParameterList(inArgs, AccessMode.Read));
-
-                abstractMethod = abstractMethod
+                        ParseValueTaskReturnType(outArgs, AccessMode.Write), abstractMethodName)
+                    .WithParameterList(
+                        ParameterList(
+                            SingletonSeparatedList(
+                                Parameter(
+                                        Identifier("request"))
+                                    .WithType(
+                                        IdentifierName("Message")))))
                     .AddModifiers(
                         Token(SyntaxKind.ProtectedKeyword),
                         Token(SyntaxKind.AbstractKeyword))
                     .WithSemicolonToken(
                         Token(SyntaxKind.SemicolonToken));
+
+                if (inArgs?.Length > 0)
+                {
+                    abstractMethod = abstractMethod.AddParameterListParameters(
+                        ParseParameterList(inArgs, AccessMode.Read));
+                }
 
                 cl = cl.AddMembers(abstractMethod);
 
@@ -180,6 +187,11 @@ namespace Tmds.DBus.SourceGenerator
                 ExpressionSyntax callAbstractMethod = AwaitExpression(
                     InvocationExpression(
                             IdentifierName(abstractMethodName))
+                        .WithArgumentList(
+                            ArgumentList(
+                                SingletonSeparatedList(
+                                    Argument(
+                                        MakeMemberAccessExpression("context", "Request")))))
                         .AddArgumentListArguments(
                             inArgs?.Select(static (argument, i) =>
                                     Argument(

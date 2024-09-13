@@ -85,7 +85,12 @@ namespace Tmds.DBus.SourceGenerator
                     .AddModifiers(Token(SyntaxKind.PublicKeyword));
 
                 if (inArgs is not null)
-                    proxyMethod = proxyMethod.WithParameterList(ParseParameterList(inArgs, AccessMode.Write));
+                {
+                    proxyMethod = proxyMethod.WithParameterList(
+                        ParameterList(
+                            SeparatedList(
+                                ParseParameterList(inArgs, AccessMode.Write))));
+                }
 
                 cl = cl.AddMembers(proxyMethod.WithBody(MakeCallMethodReturnBody(args, createMessageBody)));
             }
