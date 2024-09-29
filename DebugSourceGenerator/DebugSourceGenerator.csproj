@@ -10,27 +10,29 @@
 
     <ItemGroup>
         <AdditionalFiles Include="DBusXml/Collection.xml" DBusGeneratorMode="Handler" />
-        
+
         <AdditionalFiles Include="DBusXml/com.canonical.AppMenu.Registrar.xml" DBusGeneratorMode="Proxy" />
         <AdditionalFiles Include="DBusXml/com.canonical.dbusmenu.xml" DBusGeneratorMode="Handler" />
-    
+
         <AdditionalFiles Include="DBusXml/org.fcitx.Fcitx.InputContext.xml" DBusGeneratorMode="Proxy" />
         <AdditionalFiles Include="DBusXml/org.fcitx.Fcitx.InputMethod.xml" DBusGeneratorMode="Proxy" />
         <AdditionalFiles Include="DBusXml/org.fcitx.Fcitx.InputContext1.xml" DBusGeneratorMode="Proxy" />
         <AdditionalFiles Include="DBusXml/org.fcitx.Fcitx.InputMethod1.xml" DBusGeneratorMode="Proxy" />
-    
+
         <AdditionalFiles Include="DBusXml/org.freedesktop.DBus.xml" DBusGeneratorMode="Proxy" />
         <AdditionalFiles Include="DBusXml/org.freedesktop.IBus.Portal.xml" DBusGeneratorMode="Proxy" />
         <AdditionalFiles Include="DBusXml/org.freedesktop.portal.FileChooser.xml" DBusGeneratorMode="Proxy" />
         <AdditionalFiles Include="DBusXml/org.freedesktop.portal.Request.xml" DBusGeneratorMode="Proxy" />
         <AdditionalFiles Include="DBusXml/org.freedesktop.portal.ScreenCast.xml" DBusGeneratorMode="Proxy" />
         <AdditionalFiles Include="DBusXml/org.freedesktop.portal.Settings.xml" DBusGeneratorMode="Proxy" />
-        
+
         <AdditionalFiles Include="DBusXml/org.freedesktop.NetworkManager.xml" DBusGeneratorMode="Proxy" />
+
+        <AdditionalFiles Include="DBusXml/org.freedesktop.ModemManager1.Bearer.xml" DBusGeneratorMode="Proxy" />
 
         <AdditionalFiles Include="DBusXml/org.mpris.MediaPlayer2.Player.xml" DBusGeneratorMode="Handler" />
         <AdditionalFiles Include="DBusXml/org.mpris.MediaPlayer2.xml" DBusGeneratorMode="Handler" />
-    
+
         <AdditionalFiles Include="DBusXml/org.kde.StatusNotifierWatcher.xml" DBusGeneratorMode="Proxy" />
         <AdditionalFiles Include="DBusXml/org.kde.StatusNotifierItem.xml" DBusGeneratorMode="Handler" />
     </ItemGroup>

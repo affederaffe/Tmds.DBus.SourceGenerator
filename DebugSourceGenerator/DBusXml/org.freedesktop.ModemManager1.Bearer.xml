@@ -1,0 +1,597 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!--
+ ModemManager 1.0 Interface Specification
+
+   Copyright (C) 2011-2013 Red Hat, Inc.
+   Copyright (C) 2011-2013 Google, Inc.
+   Copyright (C) 2011-2013 Lanedo GmbH
+-->
+
+<node name="/" xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd">
+
+  <!--
+      org.freedesktop.ModemManager1.Bearer:
+      @short_description: The ModemManager Bearer interface.
+
+      This interface provides access to specific actions that may be performed
+      on available bearers.
+  -->
+  <interface name="org.freedesktop.ModemManager1.Bearer">
+
+    <!--
+        Connect:
+
+        Requests activation of a packet data connection with the network using
+        this bearer's properties. Upon successful activation, the modem can
+        send and receive packet data and, depending on the addressing
+        capability of the modem, a connection manager may need to start PPP,
+        perform DHCP, or assign the IP address returned by the modem to the
+        data interface. Upon successful return, the
+        #org.freedesktop.ModemManager1.Bearer:Ip4Config
+        and/or
+        #org.freedesktop.ModemManager1.Bearer:Ip6Config
+        properties become valid and may contain IP configuration information for
+        the data interface associated with this bearer.
+
+        Since: 1.0
+    -->
+    <method name="Connect" />
+
+    <!--
+        Disconnect:
+
+        Disconnect and deactivate this packet data connection.
+
+        Any ongoing data session will be terminated and IP addresses become
+        invalid when this method is called.
+
+        Since: 1.0
+    -->
+    <method name="Disconnect" />
+
+    <!--
+        For 3GPP (GSM/UMTS/LTE) technologies, Bearer objects represent only
+        Primary PDP contexts; Secondary contexts are not exposed as a concept
+        because they share everything with their parent primary PDP context
+        except QoS and traffic flows.  Instead, methods for setting QoS and
+        Traffic Flow Templates (TFTs) should be provided here which could as a
+        result of being called create secondary PDP contexts with those QoS and
+        TFT parameters.
+
+        FIXME: add methods to set QoS/TFT on the Bearer object, which should
+        create Secondary contexts if needed, and figure out some method of
+        disposing of those secondary contexts when no longer required.
+    -->
+
+    <!--
+        Interface:
+
+        The operating system name for the network data interface that provides
+        packet data using this bearer.
+
+        Connection managers must configure this interface depending on the IP
+        <literal>"method"</literal> given by the
+        #org.freedesktop.ModemManager1.Bearer:Ip4Config
+        or
+        #org.freedesktop.ModemManager1.Bearer:Ip6Config
+        properties set by bearer activation.
+
+        If <link linkend="MM-BEARER-IP-METHOD-STATIC:CAPS">MM_BEARER_IP_METHOD_STATIC</link>
+        or
+        <link linkend="MM-BEARER-IP-METHOD-DHCP:CAPS">MM_BEARER_IP_METHOD_DHCP</link>
+        methods are given, the interface
+        will be an ethernet-style interface suitable for DHCP or setting static
+        IP configuration on, while if the
+        <link linkend="MM-BEARER-IP-METHOD-PPP:CAPS">MM_BEARER_IP_METHOD_PPP</link>
+        method is given, the interface
+        will be a serial TTY which must then have PPP run over it.
+
+        Since: 1.0
+    -->
+    <property name="Interface" type="s" access="read" />
+
+    <!--
+        Connected:
+
+        Indicates whether or not the bearer is connected and thus whether
+        packet data communication using this bearer is possible.
+
+        Since: 1.0
+    -->
+    <property name="Connected" type="b" access="read" />
+
+    <!--
+        ConnectionError:
+
+        Provides additional information specifying the reason why the modem is
+        not connected (either due to a failed connection attempt, or due to a
+        a network initiated disconnection).
+
+        The value is composed of two strings: the registered DBus error name,
+        and an optional error message.
+
+        Since: 1.18
+    -->
+    <property name="ConnectionError" type="(ss)" access="read" />
+
+    <!--
+        Suspended:
+
+        In some devices, packet data service will be suspended while the device
+        is handling other communication, like a voice call. If packet data
+        service is suspended (but not deactivated) this property will be %TRUE.
+
+        Since: 1.0
+    -->
+    <property name="Suspended" type="b" access="read" />
+
+    <!--
+        Multiplexed:
+
+        This property will be %TRUE if the bearer is connected through a
+        multiplexed network link.
+
+        Since: 1.18
+    -->
+    <property name="Multiplexed" type="b" access="read" />
+
+    <!--
+        Ip4Config:
+
+        If the bearer was configured for IPv4 addressing, upon activation this
+        property contains the addressing details for assignment to the data
+        interface.
+
+        Mandatory items include:
+        <variablelist>
+          <varlistentry><term><literal>"method"</literal></term>
+            <listitem>
+              A <link linkend="MMBearerIpMethod">MMBearerIpMethod</link>,
+              given as an unsigned integer value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+        </variablelist>
+
+        If the bearer specifies configuration via PPP or DHCP, only the
+        <literal>"method"</literal> item is guaranteed to be present.
+
+        Additional items which are only applicable when using the
+        <link linkend="MM-BEARER-IP-METHOD-STATIC:CAPS">MM_BEARER_IP_METHOD_STATIC</link>
+        method are:
+        <variablelist>
+          <varlistentry><term><literal>"address"</literal></term>
+            <listitem>
+              IP address, given as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"prefix"</literal></term>
+            <listitem>
+              Numeric CIDR network prefix (ie, 24, 32, etc), given as an unsigned integer value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"dns1"</literal></term>
+            <listitem>
+              IP address of the first DNS server, given as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"dns2"</literal></term>
+            <listitem>
+              IP address of the second DNS server, given as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"dns3"</literal></term>
+            <listitem>
+              IP address of the third DNS server, given as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"gateway"</literal></term>
+            <listitem>
+              IP address of the default gateway, given as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+        </variablelist>
+
+        This property may also include the following items when such information is available:
+        <variablelist>
+          <varlistentry><term><literal>"mtu"</literal></term>
+            <listitem>
+              Maximum transmission unit (MTU), given as an unsigned integer value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+        </variablelist>
+
+        Since: 1.0
+    -->
+    <property name="Ip4Config" type="a{sv}" access="read" />
+
+    <!--
+        Ip6Config:
+
+        If the bearer was configured for IPv6 addressing, upon activation this
+        property contains the addressing details for assignment to the data
+        interface.
+
+        Mandatory items include:
+        <variablelist>
+          <varlistentry><term><literal>"method"</literal></term>
+            <listitem>
+              A <link linkend="MMBearerIpMethod">MMBearerIpMethod</link>,
+              given as an unsigned integer value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+        </variablelist>
+
+        If the bearer specifies configuration via PPP or DHCP, often only the
+        <literal>"method"</literal> item will be present.  IPv6 SLAAC should
+        be used to retrieve correct addressing and DNS information via Router
+        Advertisements and DHCPv6.  In some cases an IPv6 Link-Local
+        <literal>"address"</literal> item will be present, which should be
+        assigned to the data port before performing SLAAC, as the mobile network
+        may expect SLAAC setup to use this address.
+
+        Additional items which are usually only applicable when using the
+        <link linkend="MM-BEARER-IP-METHOD-STATIC:CAPS">MM_BEARER_IP_METHOD_STATIC</link>
+        method are:
+        <variablelist>
+          <varlistentry><term><literal>"address"</literal></term>
+            <listitem>
+              IP address, given as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"prefix"</literal></term>
+            <listitem>
+              Numeric CIDR network prefix (ie, 24, 32, etc), given as an unsigned integer value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"dns1"</literal></term>
+            <listitem>
+              IP address of the first DNS server, given as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"dns2"</literal></term>
+            <listitem>
+              IP address of the second DNS server, given as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"dns3"</literal></term>
+            <listitem>
+              IP address of the third DNS server, given as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"gateway"</literal></term>
+            <listitem>
+              IP address of the default gateway, given as a string value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+        </variablelist>
+
+        This property may also include the following items when such information is available:
+        <variablelist>
+          <varlistentry><term><literal>"mtu"</literal></term>
+            <listitem>
+              Maximum transmission unit (MTU), given as an unsigned integer value (signature <literal>"u"</literal>). Since 1.4.
+            </listitem>
+          </varlistentry>
+        </variablelist>
+
+        Since: 1.0
+    -->
+    <property name="Ip6Config" type="a{sv}" access="read" />
+
+    <!--
+        Stats:
+
+        If the modem supports it, this property will show statistics associated
+        to the bearer.
+
+        There are two main different statistic types reported: either applicable
+        to the ongoing connection, or otherwise compiled for all connections
+        that have been done on this bearer object.
+
+        When the connection is disconnected automatically or explicitly by the
+        user, the values applicable to the ongoing connection will show the last
+        values cached.
+
+        The following items may appear in the list of statistics:
+        <variablelist>
+          <varlistentry><term><literal>"rx-bytes"</literal></term>
+            <listitem>
+              Number of bytes received without error in the ongoing connection,
+              given as an unsigned 64-bit integer value (signature
+              <literal>"t"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"tx-bytes"</literal></term>
+            <listitem>
+              Number of bytes transmitted without error in the ongoing
+              connection, given as an unsigned 64-bit integer value (signature
+              <literal>"t"</literal>).
+            </listitem>
+            </varlistentry>
+          <varlistentry><term><literal>"start-date"</literal></term>
+            <listitem>
+              Timestamp indicating when the ongoing connection started, given
+              as an unsigned 64-bit integer value representing seconds
+              since the epoch (signature <literal>"t"</literal>).
+              Since 1.20.
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"duration"</literal></term>
+            <listitem>
+              Duration of the ongoing connection, in seconds, given as an
+              unsigned integer value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"attempts"</literal></term>
+            <listitem>
+              Total number of connection attempts done with this bearer, given
+              as an unsigned integer value (signature <literal>"u"</literal>).
+              Since 1.14.
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"failed-attempts"</literal></term>
+            <listitem>
+              Number of failed connection attempts done with this bearer,
+              given as an unsigned integer value (signature
+              <literal>"u"</literal>). Since 1.14.
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"total-rx-bytes"</literal></term>
+            <listitem>
+              Total number of bytes received without error in all the successful
+              connection establishments, given as an unsigned 64-bit integer
+              value (signature <literal>"t"</literal>). Since 1.14.
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"total-tx-bytes"</literal></term>
+            <listitem>
+              Total number of bytes transmitted without error in all the
+              successful connection establishments, given as an unsigned 64-bit
+              integer value (signature <literal>"t"</literal>). Since 1.14.
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"total-duration"</literal></term>
+            <listitem>
+              Total duration of all the successful connection establishments, in
+              seconds, given as an unsigned integer value (signature
+              <literal>"u"</literal>). Since 1.14.
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"uplink-speed"</literal></term>
+            <listitem>
+              Uplink bit rate negotiated with network, in bits per second, given
+              as an unsigned 64-bit integer value (signature <literal>"t"</literal>).
+              Since 1.20.
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"downlink-speed"</literal></term>
+            <listitem>
+              Downlink bit rate negotiated with network, in bits per second, given
+              as an unsigned 64-bit integer value (signature <literal>"t"</literal>).
+              Since 1.20.
+            </listitem>
+          </varlistentry>
+        </variablelist>
+
+        Since: 1.6
+    -->
+    <property name="Stats" type="a{sv}" access="read" />
+
+    <!--
+        ReloadStatsSupported:
+
+        Indicates whether reloading ongoing statistics is supported or not.
+
+        This property applies exclusively to the statistics that are queried from
+        the modem periodically; i.e. "rx-bytes", "tx-bytes", "uplink-speed" and
+        "downlink-speed".
+
+        The property is initialized to a fixed value as soon as the first
+        connection attempt has successfully finished. Reading this value before
+        the first successful connection attempt will always report %FALSE.
+
+        Since: 1.20
+    -->
+    <property name="ReloadStatsSupported" type="b" access="read" />
+
+    <!--
+        IpTimeout:
+
+        Maximum time to wait for a successful IP establishment, when PPP is used.
+
+        Since: 1.0
+    -->
+    <property name="IpTimeout" type="u" access="read" />
+
+    <!--
+        BearerType:
+
+        A <link linkend="MMBearerType">MMBearerType</link>
+
+        Since: 1.10
+    -->
+    <property name="BearerType" type="u" access="read" />
+
+    <!--
+        ProfileId:
+
+        The profile ID this bearer object is associated with, only applicable if
+        the modem supports profile management operations, and if the bearer is
+        connected.
+
+        If the bearer is disconnected, or if profile management operations are
+        not supported, -1 will be reported.
+
+        Since: 1.18
+    -->
+    <property name="ProfileId" type="i" access="read" />
+
+    <!--
+        Properties:
+
+        List of settings used to create the bearer.
+
+        Bearers may be implicitly created (e.g. the default initial EPS bearer
+        created during the network registration process in 4G and 5G networks)
+        or explicitly created by the user (e.g. via the
+        <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem.CreateBearer">CreateBearer()</link>
+        or <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Simple.Connect">Connect()</link>
+        calls).
+
+        The following settings apply to 3GPP (GSM/UMTS/LTE/5GNR) devices:
+
+        <variablelist>
+          <varlistentry><term><literal>"apn"</literal></term>
+            <listitem><para>
+              The Access Point Name to use in the connection, given as a string
+              value (signature <literal>"s"</literal>). For 5G NGC, this field
+              contains the Data Network Name (DNN).
+            </para></listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"ip-type"</literal></term>
+            <listitem>
+              The IP addressing type to use, given as a
+              <link linkend="MMBearerIpFamily">MMBearerIpFamily</link>
+              value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"apn-type"</literal></term>
+            <listitem>
+              The purposes of the specified APN, given as a
+              <link linkend="MMBearerApnType">MMBearerApnType</link>
+              value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"allowed-auth"</literal></term>
+            <listitem>
+              The authentication method to use, given as a
+              <link linkend="MMBearerAllowedAuth">MMBearerAllowedAuth</link>
+              value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"user"</literal></term>
+            <listitem>
+              The user name (if any) required by the network, given as a string
+              value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"password"</literal></term>
+            <listitem>
+              The password (if any) required by the network, given as a string
+              value (signature <literal>"s"</literal>).
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"access-type-preference"</literal></term>
+            <listitem><para>
+              Access type preference for 5G devices, given as a
+              <link linkend="MMBearerAccessTypePreference">MMBearerAccessTypePreference</link>
+              value (signature <literal>"u"</literal>. Since 1.20.
+            </para></listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"roaming-allowance"</literal></term>
+            <listitem><para>
+              Roaming allowance, given as a
+              <link linkend="MMBearerRoamingAllowance">MMBearerRoamingAllowance</link>
+              value (signature <literal>"u"</literal>. If supported, this setting should
+              be used instead of 'allow-roaming'. Since 1.20.
+            </para></listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"profile-id"</literal></term>
+            <listitem>
+              The ID of the 3GPP profile to connect to (signature
+              <literal>"i"</literal>), as given in the
+              <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Modem3gpp-ProfileManager.List">profile list</link>.
+              In this case, if additional profile settings are given in the properties
+              and they already exist in the profile (e.g. <literal>"apn"</literal>),
+              the new settings will be explicitly ignored; the settings stored in the
+              profile itself always take preference. The value -1 is used to
+              indicate an invalid or uninitialized profile id. Since 1.18.
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"profile-name"</literal></term>
+            <listitem><para>
+              The name of the profile, given as a string
+              value (signature <literal>"s"</literal>).
+              This value has no effect on the connection, but can be used by the host
+              to identify the profiles. This setting only applies on profile management
+              operations, it should not be used as part of the settings of an explicit
+              connection attempt. Since 1.20.
+            </para></listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"profile-enabled"</literal></term>
+            <listitem><para>
+              Boolean flag specifying whether the profile is enabled or disabled,
+              given as a boolean value (signature <literal>"b"</literal>).
+              Profiles that are disabled will not be automatically connected by the
+              modem in any way, and attempting to connect them explicitly will fail.
+              This setting only applies on profile management operations, it should
+              not be used as part of the settings of an explicit connection attempt.
+              Since 1.20.
+            </para></listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"profile-source"</literal></term>
+            <listitem><para>
+              A <link linkend="MMBearerProfileSource">MMBearerProfileSource</link>
+              value (signature <literal>"u"</literal>, specifying how the profile
+              was created. This setting only applies on profile management operations,
+              it should not be used as part of the settings of an explicit connection
+              attempt. Since 1.20.
+            </para></listitem>
+          </varlistentry>
+        </variablelist>
+
+        The following settings apply to 3GPP2 (CDMA/EVDO) devices:
+
+        <variablelist>
+          <varlistentry><term><literal>"rm-protocol"</literal></term>
+            <listitem>
+              The protocol of the Rm interface, given as a
+              <link linkend="MMModemCdmaRmProtocol">MMModemCdmaRmProtocol</link>
+              value (signature <literal>"u"</literal>).
+            </listitem>
+          </varlistentry>
+        </variablelist>
+
+        The following settings apply to all devices types:
+
+        <variablelist>
+          <varlistentry><term><literal>"allow-roaming"</literal></term>
+            <listitem>
+              Specifies whether the connections are allowed even when the device
+              is registered in a roaming (partner or non-partner) network, given as
+              a boolean value (signature <literal>"b"</literal>). This setting
+              applies only to the connection attempts started via
+              <link linkend="gdbus-method-org-freedesktop-ModemManager1-Modem-Simple.Connect">Simple.Connect()</link>
+              or <link linkend="gdbus-method-org-freedesktop-ModemManager1-Bearer.Connect">Bearer.Connect()</link>.
+              This is a volatile setting, never stored in the device.
+            </listitem>
+          </varlistentry>
+          <varlistentry><term><literal>"multiplex"</literal></term>
+            <listitem>
+              The multiplex support requested by the user, given as a
+              <link linkend="MMBearerMultiplexSupport">MMBearerMultiplexSupport</link>
+              value (signature <literal>"u"</literal>). Since 1.18.
+            </listitem>
+          </varlistentry>
+        </variablelist>
+
+        The following settings are no longer supported, but they are kept on the
+        interface for compatibility purposes:
+
+        <variablelist>
+          <varlistentry><term><literal>"number"</literal></term>
+            <listitem>
+              Number to dial for the data connection, given as a string value
+              (signature <literal>"s"</literal>).
+              Deprecated since version 1.10.0.
+            </listitem>
+          </varlistentry>
+        </variablelist>
+
+        Since: 1.0
+    -->
+    <property name="Properties" type="a{sv}" access="read" />
+
+  </interface>
+</node>
