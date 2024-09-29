@@ -138,6 +138,8 @@ namespace Tmds.DBus.SourceGenerator
             return isAnyKeyword ? $"@{identifier}" : identifier;
         }
 
+        private static string GetPropertiesClassIdentifier(DBusInterface dBusInterface) => $"{Pascalize(dBusInterface.Name!)}Properties";
+
         internal static (DBusValue DBusValue, DBusValue[] InnerDBusTypes, DBusType DBusType) ParseDBusValue(string signature) =>
             SignatureReader.Transform<(DBusValue, DBusValue[], DBusType)>(Encoding.ASCII.GetBytes(signature), MapDBusToDotNet);
 
