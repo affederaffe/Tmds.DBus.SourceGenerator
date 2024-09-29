@@ -63,7 +63,7 @@ namespace Tmds.DBus.SourceGenerator
                                     IdentifierName("Tmds.DBus.SourceGenerator"))
                                     .AddMembers(typeDeclarationSyntax);
                                 CompilationUnitSyntax compilationUnit = MakeCompilationUnit(namespaceDeclaration);
-                                productionContext.AddSource($"Tmds.DBus.SourceGenerator.{Pascalize(dBusInterface.Name!)}.g.cs", compilationUnit.GetText(Encoding.UTF8));
+                                productionContext.AddSource($"Tmds.DBus.SourceGenerator.{Pascalize(dBusInterface.Name!)}Proxy.g.cs", compilationUnit.GetText(Encoding.UTF8));
                             }
                             break;
                         case "Handler":
@@ -74,7 +74,7 @@ namespace Tmds.DBus.SourceGenerator
                                         IdentifierName("Tmds.DBus.SourceGenerator"))
                                     .AddMembers(typeDeclarationSyntax);
                                 CompilationUnitSyntax compilationUnit = MakeCompilationUnit(namespaceDeclaration);
-                                productionContext.AddSource($"Tmds.DBus.SourceGenerator.{Pascalize(dBusInterface.Name!)}.g.cs", compilationUnit.GetText(Encoding.UTF8));
+                                productionContext.AddSource($"Tmds.DBus.SourceGenerator.{Pascalize(dBusInterface.Name!)}Handler.g.cs", compilationUnit.GetText(Encoding.UTF8));
                             }
                             break;
                     }

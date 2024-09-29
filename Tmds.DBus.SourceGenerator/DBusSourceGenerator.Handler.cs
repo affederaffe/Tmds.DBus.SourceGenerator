@@ -16,8 +16,9 @@ namespace Tmds.DBus.SourceGenerator
     {
         private ClassDeclarationSyntax GenerateHandler(DBusInterface dBusInterface)
         {
-            ClassDeclarationSyntax cl = ClassDeclaration(
-                    Pascalize(dBusInterface.Name!))
+            string identifier = $"{Pascalize(dBusInterface.Name!)}Handler";
+
+            ClassDeclarationSyntax cl = ClassDeclaration(identifier)
                 .AddModifiers(
                     Token(SyntaxKind.InternalKeyword),
                     Token(SyntaxKind.AbstractKeyword))
@@ -29,8 +30,7 @@ namespace Tmds.DBus.SourceGenerator
                         "_synchronizationContext",
                         NullableType(
                             IdentifierName("SynchronizationContext"))),
-                    ConstructorDeclaration(
-                            Pascalize(dBusInterface.Name!))
+                    ConstructorDeclaration(identifier)
                         .AddModifiers(
                             Token(SyntaxKind.PublicKeyword))
                         .AddParameterListParameters(

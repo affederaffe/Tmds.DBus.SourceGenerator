@@ -12,7 +12,7 @@ namespace Tmds.DBus.SourceGenerator
     {
         private ClassDeclarationSyntax GenerateProxy(DBusInterface dBusInterface)
         {
-            string identifier = Pascalize(dBusInterface.Name!);
+            string identifier = Pascalize($"{dBusInterface.Name!}Proxy");
             ClassDeclarationSyntax cl = ClassDeclaration(identifier)
                 .AddModifiers(Token(SyntaxKind.InternalKeyword));
 
