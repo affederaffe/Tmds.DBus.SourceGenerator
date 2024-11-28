@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Linq;
 using System.Xml;
@@ -16,7 +17,7 @@ namespace Tmds.DBus.SourceGenerator
     {
         private ClassDeclarationSyntax GenerateHandler(DBusInterface dBusInterface)
         {
-            string identifier = $"{Pascalize(dBusInterface.Name!)}Handler";
+            string identifier = $"{Pascalize(dBusInterface.Name.AsSpan())}Handler";
 
             ClassDeclarationSyntax cl = ClassDeclaration(identifier)
                 .AddModifiers(
@@ -104,7 +105,7 @@ namespace Tmds.DBus.SourceGenerator
                                                 inArgs?.Length > 0
                                                 ? ConstantPattern(
                                                     MakeLiteralExpression(
-                                                        ParseSignature(inArgs)!))
+                                                        ParseSignature(inArgs)))
                                                 : BinaryPattern(SyntaxKind.OrPattern,
                                                     ConstantPattern(
                                                         MakeLiteralExpression(string.Empty)),
@@ -114,7 +115,7 @@ namespace Tmds.DBus.SourceGenerator
 
                 BlockSyntax switchSectionBlock = Block();
 
-                string abstractMethodName = $"On{Pascalize(dBusMethod.Name!)}Async";
+                string abstractMethodName = $"On{Pascalize(dBusMethod.Name.AsSpan())}Async";
 
                 MethodDeclarationSyntax abstractMethod = MethodDeclaration(
                         ParseValueTaskReturnType(outArgs, AccessMode.Write), abstractMethodName)
@@ -154,13 +155,13 @@ namespace Tmds.DBus.SourceGenerator
 
                     for (int i = 0; i < inArgs.Length; i++)
                     {
-                        string identifier = inArgs[i].Name is not null ? SanitizeIdentifier(Camelize(inArgs[i].Name!)) : $"arg{i}";
+                        string identifier = inArgs[i].Name is not null ? SanitizeIdentifier(Camelize(inArgs[i].Name.AsSpan())) : $"arg{i}";
                         readParametersMethodBlock = readParametersMethodBlock.AddStatements(
                             ExpressionStatement(
                                 AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(identifier), InvocationExpression(
-                                    MakeMemberAccessExpression("reader", GetOrAddReadMethod(inArgs[i]))))));
+                                    MakeMemberAccessExpression("reader", GetOrAddReadMethod(inArgs[i].DBusDotnetType))))));
                         argFields[i] = LocalDeclarationStatement(
-                            VariableDeclaration(GetDotnetType(inArgs[i], AccessMode.Read))
+                            VariableDeclaration(inArgs[i].DBusDotnetType.ToTypeSyntax(AccessMode.Read))
                                 .AddVariables(
                                     VariableDeclarator(identifier)));
                     }
@@ -179,7 +180,7 @@ namespace Tmds.DBus.SourceGenerator
                 {
                     switchSectionBlock = switchSectionBlock.AddStatements(
                         LocalDeclarationStatement(
-                            VariableDeclaration(ParseReturnType(outArgs, AccessMode.Write)!)
+                            VariableDeclaration(ParseReturnType(outArgs, AccessMode.Write))
                                 .AddVariables(
                                     VariableDeclarator("ret"))));
                 }
@@ -196,7 +197,8 @@ namespace Tmds.DBus.SourceGenerator
                             inArgs?.Select(static (argument, i) =>
                                     Argument(
                                         IdentifierName(argument.Name is not null
-                                            ? SanitizeIdentifier(Camelize(argument.Name))
+                                            ? SanitizeIdentifier(
+                                                Camelize(argument.Name.AsSpan()))
                                             : $"arg{i}")))
                                 .ToArray() ?? []));
 
@@ -229,7 +231,7 @@ namespace Tmds.DBus.SourceGenerator
                                                                 outArgs?.Length > 0
                                                                     ? LocalDeclarationStatement(
                                                                     VariableDeclaration(
-                                                                            ParseReturnType(outArgs, AccessMode.Write)!)
+                                                                            ParseReturnType(outArgs, AccessMode.Write))
                                                                         .AddVariables(
                                                                             VariableDeclarator("ret1")
                                                                                 .WithInitializer(
@@ -285,7 +287,7 @@ namespace Tmds.DBus.SourceGenerator
                                                             Argument(
                                                                 outArgs?.Length > 0
                                                                     ? MakeLiteralExpression(
-                                                                        ParseSignature(outArgs)!)
+                                                                        ParseSignature(outArgs))
                                                                     : LiteralExpression(SyntaxKind.NullLiteralExpression))))))));
 
                     if (outArgs?.Length == 1)
@@ -293,7 +295,7 @@ namespace Tmds.DBus.SourceGenerator
                         replyMethodBlock = replyMethodBlock.AddStatements(
                             ExpressionStatement(
                                 InvocationExpression(
-                                        MakeMemberAccessExpression("writer", GetOrAddWriteMethod(outArgs[0])))
+                                        MakeMemberAccessExpression("writer", GetOrAddWriteMethod(outArgs[0].DBusDotnetType)))
                                     .AddArgumentListArguments(
                                         Argument(
                                             IdentifierName("ret")))));
@@ -305,11 +307,11 @@ namespace Tmds.DBus.SourceGenerator
                             replyMethodBlock = replyMethodBlock.AddStatements(
                                 ExpressionStatement(
                                     InvocationExpression(
-                                            MakeMemberAccessExpression("writer", GetOrAddWriteMethod(outArgs[i])))
+                                            MakeMemberAccessExpression("writer", GetOrAddWriteMethod(outArgs[i].DBusDotnetType)))
                                         .AddArgumentListArguments(
                                             Argument(
                                                 MakeMemberAccessExpression("ret", outArgs[i].Name is not null
-                                                    ? SanitizeIdentifier(Pascalize(outArgs[i].Name!))
+                                                    ? SanitizeIdentifier(Pascalize(outArgs[i].Name.AsSpan()))
                                                     : $"Item{i + 1}")))));
                         }
                     }
@@ -381,8 +383,8 @@ namespace Tmds.DBus.SourceGenerator
 
             MemberDeclarationSyntax[] properties = dBusInterface.Properties.Select(static property =>
                     MakeGetSetProperty(
-                        GetDotnetType(property, AccessMode.Write, true),
-                        Pascalize(property.Name!),
+                        property.DBusDotnetType.ToTypeSyntax(AccessMode.Write, true),
+                        Pascalize(property.Name.AsSpan()),
                         property.Access is "write" or "readwrite"
                             ? [Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.AbstractKeyword)]
                             : [Token(SyntaxKind.PublicKeyword)]))
@@ -436,11 +438,11 @@ namespace Tmds.DBus.SourceGenerator
                                                     MakeLiteralExpression(property.Type!)))),
                                     ExpressionStatement(
                                         InvocationExpression(
-                                                MakeMemberAccessExpression("writer", GetOrAddWriteMethod(property)))
+                                                MakeMemberAccessExpression("writer", GetOrAddWriteMethod(property.DBusDotnetType)))
                                             .AddArgumentListArguments(
                                                 Argument(
                                                     IdentifierName(
-                                                        Pascalize(property.Name!))))),
+                                                        Pascalize(property.Name.AsSpan()))))),
                                     ExpressionStatement(
                                         InvocationExpression(
                                                 MakeMemberAccessExpression("context", "Reply"))
@@ -498,9 +500,9 @@ namespace Tmds.DBus.SourceGenerator
                                     ExpressionStatement(
                                         MakeAssignmentExpression(
                                             IdentifierName(
-                                                Pascalize(property.Name!)),
+                                                Pascalize(property.Name.AsSpan())),
                                             InvocationExpression(
-                                                MakeMemberAccessExpression("reader", GetOrAddReadMethod(property))))),
+                                                MakeMemberAccessExpression("reader", GetOrAddReadMethod(property.DBusDotnetType))))),
                                     BreakStatement()))));
 
             setPropertyMethod = setPropertyMethod.WithBody(
@@ -575,11 +577,11 @@ namespace Tmds.DBus.SourceGenerator
                                                             MakeLiteralExpression(property.Type!)))),
                                             ExpressionStatement(
                                                 InvocationExpression(
-                                                        MakeMemberAccessExpression("writer", GetOrAddWriteMethod(property)))
+                                                        MakeMemberAccessExpression("writer", GetOrAddWriteMethod(property.DBusDotnetType)))
                                                     .AddArgumentListArguments(
                                                         Argument(
                                                             IdentifierName(
-                                                                Pascalize(property.Name!)))))
+                                                                Pascalize(property.Name.AsSpan())))))
                                         }).ToArray())
                             .AddBodyStatements(
                                 ExpressionStatement(
@@ -633,7 +635,7 @@ namespace Tmds.DBus.SourceGenerator
                 MethodDeclarationSyntax method = MethodDeclaration(
                         PredefinedType(
                             Token(SyntaxKind.VoidKeyword)),
-                        $"Emit{Pascalize(signal.Name!)}")
+                        $"Emit{Pascalize(signal.Name.AsSpan())}")
                     .AddModifiers(
                         Token(SyntaxKind.ProtectedKeyword));
 
@@ -644,9 +646,12 @@ namespace Tmds.DBus.SourceGenerator
                             SeparatedList(
                                 signal.Arguments.Select(
                                     static (argument, i) => Parameter(
-                                        Identifier(argument.Name is not null ? SanitizeIdentifier(Camelize(argument.Name)) : $"arg{i}"))
+                                        Identifier(argument.Name is not null
+                                            ? SanitizeIdentifier(
+                                                Camelize(argument.Name.AsSpan()))
+                                            : $"arg{i}"))
                                         .WithType(
-                                            GetDotnetType(argument, AccessMode.Write, true))))));
+                                            argument.DBusDotnetType.ToTypeSyntax(AccessMode.Write, true))))));
                 }
 
                 BlockSyntax body = Block();
@@ -676,7 +681,7 @@ namespace Tmds.DBus.SourceGenerator
                     args = args.AddArguments(
                         Argument(
                             MakeLiteralExpression(
-                                ParseSignature(signal.Arguments)!)));
+                                ParseSignature(signal.Arguments))));
                 }
 
                 body = body.AddStatements(
@@ -692,11 +697,11 @@ namespace Tmds.DBus.SourceGenerator
                         body = body.AddStatements(
                             ExpressionStatement(
                                 InvocationExpression(
-                                        MakeMemberAccessExpression("writer", GetOrAddWriteMethod(signal.Arguments[i])))
+                                        MakeMemberAccessExpression("writer", GetOrAddWriteMethod(signal.Arguments[i].DBusDotnetType)))
                                     .AddArgumentListArguments(
                                         Argument(
                                             IdentifierName(signal.Arguments[i].Name is not null
-                                                ? Camelize(signal.Arguments[i].Name!)
+                                                ? Camelize(signal.Arguments[i].Name.AsSpan())
                                                 : $"arg{i}")))));
                     }
                 }

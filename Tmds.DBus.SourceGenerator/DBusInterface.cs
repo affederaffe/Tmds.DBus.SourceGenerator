@@ -82,10 +82,7 @@ namespace Tmds.DBus.SourceGenerator
     public class DBusValue
     {
         [XmlIgnore]
-        private DBusType _dBusType;
-
-        [XmlIgnore]
-        private DBusValue[]? _innerDBusTypes;
+        private DBusSourceGenerator.DBusDotnetType? _dbusDotnetType;
 
         [XmlAttribute("name")]
         public string? Name { get; set; }
@@ -94,27 +91,6 @@ namespace Tmds.DBus.SourceGenerator
         public string? Type { get; set; }
 
         [XmlIgnore]
-        public DBusType DBusType
-        {
-            get
-            {
-                if (_dBusType != DBusType.Invalid)
-                    return _dBusType;
-                (_, _innerDBusTypes, _dBusType) = DBusSourceGenerator.ParseDBusValue(Type!);
-                return _dBusType;
-            }
-        }
-
-        [XmlIgnore]
-        public DBusValue[]? InnerDBusTypes
-        {
-            get
-            {
-                if (_innerDBusTypes is not null)
-                    return _innerDBusTypes;
-                (_, _innerDBusTypes, _dBusType) = DBusSourceGenerator.ParseDBusValue(Type!);
-                return _innerDBusTypes;
-            }
-        }
+        public DBusSourceGenerator.DBusDotnetType DBusDotnetType => _dbusDotnetType ??= DBusSourceGenerator.DBusDotnetType.FromDBusValue(this);
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
 
@@ -13,22 +14,7 @@ namespace Tmds.DBus.SourceGenerator
 {
     public partial class DBusSourceGenerator
     {
-        private static readonly DBusValue _byteValue = new() { Type = "y" };
-        private static readonly DBusValue _boolValue = new() { Type = "b" };
-        private static readonly DBusValue _int16Value = new() { Type = "n" };
-        private static readonly DBusValue _uInt16Value = new() { Type = "q" };
-        private static readonly DBusValue _int32Value = new() { Type = "i" };
-        private static readonly DBusValue _uInt32Value = new() { Type = "u" };
-        private static readonly DBusValue _int64Value = new() { Type = "x" };
-        private static readonly DBusValue _uInt64Value = new() { Type = "t" };
-        private static readonly DBusValue _doubleValue = new() { Type = "d" };
-        private static readonly DBusValue _stringValue = new() { Type = "s" };
-        private static readonly DBusValue _objectPathValue = new() { Type = "o" };
-        private static readonly DBusValue _signatureValue = new() { Type = "g" };
-        private static readonly DBusValue _variantValue = new() { Type = "v" };
-        private static readonly DBusValue _unixFdValue = new() { Type = "h" };
-
-        private static string Pascalize(string name, bool camel = false)
+        private static string Pascalize(ReadOnlySpan<char> name, bool camel = false)
         {
             bool upperizeNext = !camel;
             StringBuilder sb = new(name.Length);
@@ -54,58 +40,60 @@ namespace Tmds.DBus.SourceGenerator
             return sb.ToString();
         }
 
-        private static string Camelize(string name)
+        private static string Camelize(ReadOnlySpan<char> name)
         {
             StringBuilder sb = new(Pascalize(name));
             sb[0] = char.ToLowerInvariant(sb[0]);
             return sb.ToString();
         }
 
-        private static string? ParseSignature(IReadOnlyList<DBusValue>? dBusValues)
+        [return: NotNullIfNotNull("dbusValues")]
+        private static string? ParseSignature(IReadOnlyList<DBusValue>? dbusValues)
         {
-            if (dBusValues is null || dBusValues.Count == 0)
+            if (dbusValues is null || dbusValues.Count == 0)
                 return null;
 
             StringBuilder sb = new();
-            foreach (DBusValue dBusValue in dBusValues.Where(static argument => argument.Type is not null))
+            foreach (DBusValue dBusValue in dbusValues.Where(static argument => argument.Type is not null))
                 sb.Append(dBusValue.Type);
 
             return sb.ToString();
         }
 
-        private static TypeSyntax? ParseReturnType(IReadOnlyList<DBusValue>? dBusValues, AccessMode accessMode) => dBusValues?.Count switch
+        [return: NotNullIfNotNull("dbusValues")]
+        private static TypeSyntax? ParseReturnType(IReadOnlyList<DBusValue>? dbusValues, AccessMode accessMode) => dbusValues?.Count switch
         {
             0 or null => null,
-            1 => GetDotnetType(dBusValues[0], accessMode),
+            1 => dbusValues[0].DBusDotnetType.ToTypeSyntax(accessMode),
             _ => TupleType()
                 .AddElements(
-                    dBusValues.Select((dBusValue, i) => TupleElement(
-                                GetDotnetType(dBusValue, accessMode))
+                    dbusValues.Select((dbusValue, i) => TupleElement(
+                                dbusValue.DBusDotnetType.ToTypeSyntax(accessMode))
                             .WithIdentifier(
-                                Identifier(dBusValue.Name is not null
+                                Identifier(dbusValue.Name is not null
                                     ? SanitizeIdentifier(
-                                        Pascalize(dBusValue.Name))
+                                        Pascalize(dbusValue.Name.AsSpan()))
                                     : $"Item{i + 1}")))
                         .ToArray())
         };
 
-        private static TypeSyntax ParseTaskReturnType(IReadOnlyList<DBusValue>? dBusValues, AccessMode accessMode) => dBusValues?.Count switch
+        private static TypeSyntax ParseTaskReturnType(IReadOnlyList<DBusValue>? dbusValues, AccessMode accessMode) => dbusValues?.Count switch
         {
             0 or null => IdentifierName("Task"),
             _ => GenericName("Task")
                 .AddTypeArgumentListArguments(
-                    ParseReturnType(dBusValues, accessMode)!)
+                    ParseReturnType(dbusValues, accessMode))
         };
 
-        private static TypeSyntax ParseValueTaskReturnType(IReadOnlyList<DBusValue>? dBusValues, AccessMode accessMode) => dBusValues?.Count switch
+        private static TypeSyntax ParseValueTaskReturnType(IReadOnlyList<DBusValue>? dbusValues, AccessMode accessMode) => dbusValues?.Count switch
         {
             0 or null => IdentifierName("ValueTask"),
             _ => GenericName("ValueTask")
                 .AddTypeArgumentListArguments(
-                    ParseReturnType(dBusValues, accessMode)!)
+                    ParseReturnType(dbusValues, accessMode))
         };
 
-        private static TypeSyntax ParseTaskCompletionSourceType(IReadOnlyList<DBusValue>? dBusValues, AccessMode accessMode) => dBusValues?.Count switch
+        private static TypeSyntax ParseTaskCompletionSourceType(IReadOnlyList<DBusValue>? dbusValues, AccessMode accessMode) => dbusValues?.Count switch
         {
             0 or null => GenericName("TaskCompletionSource")
                 .AddTypeArgumentListArguments(
@@ -113,129 +101,219 @@ namespace Tmds.DBus.SourceGenerator
                         Token(SyntaxKind.BoolKeyword))),
             _ => GenericName("TaskCompletionSource")
                 .AddTypeArgumentListArguments(
-                    ParseReturnType(dBusValues, accessMode)!)
+                    ParseReturnType(dbusValues, accessMode))
         };
 
-        private static ParameterSyntax[] ParseParameterList(IEnumerable<DBusValue> inArgs, AccessMode accessMode) => inArgs.Select((x, i) =>
+        private static ParameterSyntax[] ParseParameterList(IReadOnlyList<DBusValue> inArgs, AccessMode accessMode) => inArgs.Select((dbusValue, i) =>
                 Parameter(
-                        Identifier(x.Name is not null
+                        Identifier(dbusValue.Name is not null
                             ? SanitizeIdentifier(
-                                Camelize(x.Name))
+                                Camelize(dbusValue.Name.AsSpan()))
                             : $"arg{i}"))
                     .WithType(
-                        GetDotnetType(x, accessMode)))
+                        dbusValue.DBusDotnetType.ToTypeSyntax(accessMode)))
             .ToArray();
 
-        private static string SanitizeSignature(string signature) =>
+        private static string SanitizeSignature(in string signature) =>
             signature.Replace('{', 'e')
                 .Replace("}", null)
                 .Replace('(', 'r')
                 .Replace(')', 'z');
 
-        private static string SanitizeIdentifier(string identifier)
+        private static string SanitizeIdentifier(in string identifier)
         {
             bool isAnyKeyword = SyntaxFacts.GetKeywordKind(identifier) != SyntaxKind.None || SyntaxFacts.GetContextualKeywordKind(identifier) != SyntaxKind.None;
             return isAnyKeyword ? $"@{identifier}" : identifier;
         }
 
-        private static string GetPropertiesClassIdentifier(DBusInterface dBusInterface) => $"{Pascalize(dBusInterface.Name!)}Properties";
+        private static string GetPropertiesClassIdentifier(DBusInterface dBusInterface) => $"{Pascalize(dBusInterface.Name.AsSpan())}Properties";
 
-        internal static (DBusValue DBusValue, DBusValue[] InnerDBusTypes, DBusType DBusType) ParseDBusValue(string signature) =>
-            SignatureReader.Transform<(DBusValue, DBusValue[], DBusType)>(Encoding.ASCII.GetBytes(signature), MapDBusToDotNet);
-
-        private static (DBusValue, DBusValue[], DBusType) MapDBusToDotNet(DBusType dBusType, (DBusValue, DBusValue[], DBusType)[] inner)
+        public enum DotnetType
         {
-            DBusValue[] innerDBusTypes = inner.Select(static x => x.Item1).ToArray();
-            return dBusType switch
-            {
-                DBusType.Byte => (_byteValue, innerDBusTypes, dBusType),
-                DBusType.Bool => (_boolValue, innerDBusTypes, dBusType),
-                DBusType.Int16 => (_int16Value, innerDBusTypes, dBusType),
-                DBusType.UInt16 => (_uInt16Value, innerDBusTypes, dBusType),
-                DBusType.Int32 => (_int32Value, innerDBusTypes, dBusType),
-                DBusType.UInt32 => (_uInt32Value, innerDBusTypes, dBusType),
-                DBusType.Int64 => (_int64Value, innerDBusTypes, dBusType),
-                DBusType.UInt64 => (_uInt64Value, innerDBusTypes, dBusType),
-                DBusType.Double => (_doubleValue, innerDBusTypes, dBusType),
-                DBusType.String => (_stringValue, innerDBusTypes, dBusType),
-                DBusType.ObjectPath => (_objectPathValue, innerDBusTypes, dBusType),
-                DBusType.Signature => (_signatureValue, innerDBusTypes, dBusType),
-                DBusType.Variant => (_variantValue, innerDBusTypes, dBusType),
-                DBusType.UnixFd => (_unixFdValue, innerDBusTypes, dBusType),
-                DBusType.Array => (new DBusValue { Type = $"a{ParseSignature(innerDBusTypes)}"}, innerDBusTypes, dBusType),
-                DBusType.DictEntry => (new DBusValue { Type = $"a{{{ParseSignature(innerDBusTypes)}}}"}, innerDBusTypes, dBusType),
-                DBusType.Struct => (new DBusValue { Type = $"({ParseSignature(innerDBusTypes)})"}, innerDBusTypes, dBusType),
-                _ => throw new ArgumentOutOfRangeException(nameof(dBusType), dBusType, $"Cannot parse DBusType with value {dBusType}")
-            };
+            Byte,
+            Bool,
+            Int16,
+            UInt16,
+            Int32,
+            UInt32,
+            Int64,
+            UInt64,
+            Double,
+            String,
+            ObjectPath,
+            Signature,
+            Array,
+            Tuple,
+            Variant,
+            Dictionary,
+            SafeFileHandle
         }
 
-        private static TypeSyntax GetDotnetType(DBusValue dBusValue, AccessMode accessMode, bool nullable = false)
+        public class DBusDotnetType
         {
-            switch (dBusValue.DBusType)
+            private DBusDotnetType(DotnetType dotnetType, DBusType dBusType, string dBusTypeSignature, DBusDotnetType[] innerTypes)
             {
-                case DBusType.Byte:
-                    return PredefinedType(Token(SyntaxKind.ByteKeyword));
-                case DBusType.Bool:
-                    return PredefinedType(Token(SyntaxKind.BoolKeyword));
-                case DBusType.Int16:
-                    return PredefinedType(Token(SyntaxKind.ShortKeyword));
-                case DBusType.UInt16:
-                    return PredefinedType(Token(SyntaxKind.UShortKeyword));
-                case DBusType.Int32:
-                    return PredefinedType(Token(SyntaxKind.IntKeyword));
-                case DBusType.UInt32:
-                    return PredefinedType(Token(SyntaxKind.UIntKeyword));
-                case DBusType.Int64:
-                    return PredefinedType(Token(SyntaxKind.LongKeyword));
-                case DBusType.UInt64:
-                    return PredefinedType(Token(SyntaxKind.ULongKeyword));
-                case DBusType.Double:
-                    return PredefinedType(Token(SyntaxKind.DoubleKeyword));
-                case DBusType.String:
-                    TypeSyntax str = PredefinedType(Token(SyntaxKind.StringKeyword));
-                    if (nullable)
-                        str = NullableType(str);
-                    return str;
-                case DBusType.ObjectPath:
-                    return IdentifierName("ObjectPath");
-                case DBusType.Signature:
-                    return IdentifierName("Signature");
-                case DBusType.Variant when accessMode == AccessMode.Read:
-                    return IdentifierName("VariantValue");
-                case DBusType.Variant when accessMode == AccessMode.Write:
-                    return IdentifierName("Variant");
-                case DBusType.UnixFd:
-                    return IdentifierName("SafeFileHandle");
-                case DBusType.Array:
-                    TypeSyntax arr = ArrayType(
-                            GetDotnetType(dBusValue.InnerDBusTypes![0], accessMode, nullable))
-                        .AddRankSpecifiers(ArrayRankSpecifier()
-                            .AddSizes(OmittedArraySizeExpression()));
-                    if (nullable)
-                        arr = NullableType(arr);
-                    return arr;
-                case DBusType.DictEntry:
-                    TypeSyntax dict = GenericName("Dictionary")
-                        .AddTypeArgumentListArguments(
-                            GetDotnetType(dBusValue.InnerDBusTypes![0], accessMode),
-                            GetDotnetType(dBusValue.InnerDBusTypes![1], accessMode, nullable));
-                    if (nullable)
-                        dict = NullableType(dict);
-                    return dict;
-                case DBusType.Struct when dBusValue.InnerDBusTypes!.Length == 1:
-                    return GenericName("ValueTuple")
-                        .AddTypeArgumentListArguments(
-                            GetDotnetType(dBusValue.InnerDBusTypes![0], accessMode, nullable));
-                case DBusType.Struct:
-                    return TupleType()
-                        .AddElements(
-                            dBusValue.InnerDBusTypes!.Select(
-                                    dbusType => TupleElement(
-                                        GetDotnetType(dbusType, accessMode, nullable)))
-                                .ToArray());
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(dBusValue.DBusType), dBusValue.DBusType,
-                        $"Cannot parse DBusType with value {dBusValue.DBusType}");
+                DotnetType = dotnetType;
+                InnerTypes = innerTypes;
+                DBusTypeSignature = dBusTypeSignature;
+                DBusType = dBusType;
+            }
+
+            private static readonly DBusDotnetType ByteType = new(DotnetType.Byte, DBusType.Byte, "y", []);
+            private static readonly DBusDotnetType BoolType = new(DotnetType.Bool, DBusType.Bool, "b", []);
+            private static readonly DBusDotnetType Int16Type = new(DotnetType.Int16, DBusType.Int16, "n", []);
+            private static readonly DBusDotnetType UInt16Type = new(DotnetType.UInt16, DBusType.UInt16, "q", []);
+            private static readonly DBusDotnetType Int32Type = new(DotnetType.Int32, DBusType.Int32, "i", []);
+            private static readonly DBusDotnetType UInt32Type = new(DotnetType.UInt32, DBusType.UInt32, "u", []);
+            private static readonly DBusDotnetType Int64Type = new(DotnetType.Int64, DBusType.Int64, "x", []);
+            private static readonly DBusDotnetType UInt64Type = new(DotnetType.UInt64, DBusType.UInt64, "t", []);
+            private static readonly DBusDotnetType DoubleType = new(DotnetType.Double, DBusType.Double, "d", []);
+            private static readonly DBusDotnetType StringType = new(DotnetType.String, DBusType.String, "s", []);
+            private static readonly DBusDotnetType ObjectPathType = new(DotnetType.ObjectPath, DBusType.ObjectPath, "o", []);
+            private static readonly DBusDotnetType SignatureType = new(DotnetType.Signature, DBusType.Signature, "g", []);
+            private static readonly DBusDotnetType UnixFdType = new(DotnetType.SafeFileHandle, DBusType.UnixFd, "h", []);
+
+            internal static readonly DBusDotnetType StringArrayType = new(DotnetType.Array, DBusType.Array, "as", [StringType]);
+
+            public DotnetType DotnetType { get; }
+
+            public DBusType DBusType { get; }
+
+            public string DBusTypeSignature { get; }
+
+            public DBusDotnetType[] InnerTypes { get; }
+
+            public TypeSyntax ToTypeSyntax(AccessMode accessMode, bool nullable = false) =>
+                ToTypeSyntax(DotnetType, InnerTypes, accessMode, nullable);
+
+            public static DBusDotnetType FromDBusValue(DBusValue dbusValue)
+            {
+                ReadOnlySpan<byte> signature = Encoding.ASCII.GetBytes(dbusValue.Type!).AsSpan();
+                return SignatureReader.Transform<DBusDotnetType>(signature, Map);
+            }
+
+            private static DBusDotnetType Map(DBusType dbusType, string? signature, DBusDotnetType[] innerTypes)
+            {
+                switch (dbusType)
+                {
+                    case DBusType.Byte:
+                        return ByteType;
+                    case DBusType.Bool:
+                        return BoolType;
+                    case DBusType.Int16:
+                        return Int16Type;
+                    case DBusType.UInt16:
+                        return UInt16Type;
+                    case DBusType.Int32:
+                        return Int32Type;
+                    case DBusType.UInt32:
+                        return UInt32Type;
+                    case DBusType.Int64:
+                        return Int64Type;
+                    case DBusType.UInt64:
+                        return UInt64Type;
+                    case DBusType.Double:
+                        return DoubleType;
+                    case DBusType.String:
+                        return StringType;
+                    case DBusType.ObjectPath:
+                        return ObjectPathType;
+                    case DBusType.Signature:
+                        return SignatureType;
+                    case DBusType.Array when innerTypes.Length == 1:
+                        return new DBusDotnetType(DotnetType.Array, DBusType.Array, signature!, innerTypes);
+                    case DBusType.Struct when innerTypes.Length > 0:
+                        return new DBusDotnetType(DotnetType.Tuple, DBusType.Struct, signature!, innerTypes);
+                    case DBusType.Variant:
+                        return new DBusDotnetType(DotnetType.Variant, DBusType.Variant, signature!, innerTypes);
+                    case DBusType.DictEntry when innerTypes.Length == 2:
+                        return new DBusDotnetType(DotnetType.Dictionary, DBusType.Array, signature!, innerTypes);
+                    case DBusType.UnixFd:
+                        return UnixFdType;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(dbusType), dbusType, null);
+                }
+            }
+
+            private static TypeSyntax ToTypeSyntax(DotnetType type, DBusDotnetType[]? innerTypes, AccessMode accessMode, bool nullable = false)
+            {
+                switch (type)
+                {
+                    case DotnetType.Byte:
+                        return PredefinedType(
+                            Token(SyntaxKind.ByteKeyword));
+                    case DotnetType.Bool:
+                        return PredefinedType(
+                            Token(SyntaxKind.BoolKeyword));
+                    case DotnetType.Int16:
+                        return PredefinedType(
+                            Token(SyntaxKind.ShortKeyword));
+                    case DotnetType.UInt16:
+                        return PredefinedType(
+                            Token(SyntaxKind.UShortKeyword));
+                    case DotnetType.Int32:
+                        return PredefinedType(
+                            Token(SyntaxKind.IntKeyword));
+                    case DotnetType.UInt32:
+                        return PredefinedType(
+                            Token(SyntaxKind.UIntKeyword));
+                    case DotnetType.Int64:
+                        return PredefinedType(
+                            Token(SyntaxKind.LongKeyword));
+                    case DotnetType.UInt64:
+                        return PredefinedType(
+                            Token(SyntaxKind.ULongKeyword));
+                    case DotnetType.Double:
+                        return PredefinedType(
+                            Token(SyntaxKind.DoubleKeyword));
+                    case DotnetType.String:
+                        TypeSyntax str = PredefinedType(
+                            Token(SyntaxKind.StringKeyword));
+                        if (nullable)
+                            str = NullableType(str);
+                        return str;
+                    case DotnetType.ObjectPath:
+                        return IdentifierName("ObjectPath");
+                    case DotnetType.Signature:
+                        return IdentifierName("Signature");
+                    case DotnetType.Variant when accessMode == AccessMode.Read:
+                        return IdentifierName("VariantValue");
+                    case DotnetType.Variant when accessMode == AccessMode.Write:
+                        return IdentifierName("Variant");
+                    case DotnetType.SafeFileHandle:
+                        return IdentifierName("SafeFileHandle");
+                    case DotnetType.Array:
+                        TypeSyntax arr = ArrayType(
+                                innerTypes![0].ToTypeSyntax(accessMode, nullable))
+                            .AddRankSpecifiers(
+                                ArrayRankSpecifier()
+                                    .AddSizes(
+                                        OmittedArraySizeExpression()));
+                        if (nullable)
+                            arr = NullableType(arr);
+                        return arr;
+                    case DotnetType.Dictionary:
+                        TypeSyntax dict = GenericName("Dictionary")
+                            .AddTypeArgumentListArguments(
+                                innerTypes![0].ToTypeSyntax(accessMode),
+                                innerTypes[1].ToTypeSyntax(accessMode, nullable));
+                        if (nullable)
+                            dict = NullableType(dict);
+                        return dict;
+                    case DotnetType.Tuple when innerTypes!.Length == 1:
+                        return GenericName("ValueTuple")
+                            .AddTypeArgumentListArguments(
+                                innerTypes[0].ToTypeSyntax(accessMode, nullable));
+                    case DotnetType.Tuple:
+                        return TupleType()
+                            .AddElements(
+                                innerTypes.Select(
+                                        innerType => TupleElement(
+                                            innerType.ToTypeSyntax(accessMode, nullable)))
+                                    .ToArray());
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(type), type,$"Cannot parse DotnetType with value {type}");
+                }
             }
         }
     }

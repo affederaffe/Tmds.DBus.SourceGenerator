@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 
 using Microsoft.CodeAnalysis.CSharp;
@@ -12,7 +13,7 @@ namespace Tmds.DBus.SourceGenerator
     {
         private ClassDeclarationSyntax GenerateProxy(DBusInterface dBusInterface)
         {
-            string identifier = Pascalize($"{dBusInterface.Name!}Proxy");
+            string identifier = $"{Pascalize(dBusInterface.Name.AsSpan())}Proxy";
             ClassDeclarationSyntax cl = ClassDeclaration(identifier)
                 .AddModifiers(Token(SyntaxKind.InternalKeyword));
 
@@ -22,16 +23,23 @@ namespace Tmds.DBus.SourceGenerator
             FieldDeclarationSyntax pathField = MakePrivateReadOnlyField("_path", PredefinedType(Token(SyntaxKind.StringKeyword)));
 
             ConstructorDeclarationSyntax ctor = ConstructorDeclaration(identifier)
-                .AddModifiers(Token(SyntaxKind.PublicKeyword))
+                .AddModifiers(
+                    Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(
-                    Parameter(Identifier("connection"))
-                        .WithType(IdentifierName("Connection")),
-                    Parameter(Identifier("destination"))
+                    Parameter(
+                            Identifier("connection"))
                         .WithType(
-                            PredefinedType(Token(SyntaxKind.StringKeyword))),
-                    Parameter(Identifier("path"))
+                            IdentifierName("Connection")),
+                    Parameter(
+                            Identifier("destination"))
                         .WithType(
-                            PredefinedType(Token(SyntaxKind.StringKeyword))))
+                            PredefinedType(
+                                Token(SyntaxKind.StringKeyword))),
+                    Parameter(
+                            Identifier("path"))
+                        .WithType(
+                            PredefinedType(
+                                Token(SyntaxKind.StringKeyword))))
                 .WithBody(
                     Block(
                         MakeAssignmentExpressionStatement("_connection", "connection"),
@@ -72,15 +80,19 @@ namespace Tmds.DBus.SourceGenerator
 
                 StatementSyntax[] statements = inArgs?.Select((arg, i) => ExpressionStatement(
                         InvocationExpression(
-                                MakeMemberAccessExpression("writer", GetOrAddWriteMethod(arg)))
+                                MakeMemberAccessExpression("writer", GetOrAddWriteMethod(arg.DBusDotnetType)))
                             .AddArgumentListArguments(
-                                Argument(IdentifierName(arg.Name is not null ? SanitizeIdentifier(Camelize(arg.Name)) : $"arg{i}")))))
+                                Argument(
+                                    IdentifierName(arg.Name is not null
+                                        ? SanitizeIdentifier(
+                                            Camelize(arg.Name.AsSpan()))
+                                        : $"arg{i}")))))
                     .Cast<StatementSyntax>()
                     .ToArray() ?? [];
 
                 BlockSyntax createMessageBody = MakeCreateMessageBody(IdentifierName("Interface"), dBusMethod.Name!, ParseSignature(inArgs), statements);
 
-                MethodDeclarationSyntax proxyMethod = MethodDeclaration(ParseTaskReturnType(outArgs, AccessMode.Read), $"{Pascalize(dBusMethod.Name!)}Async")
+                MethodDeclarationSyntax proxyMethod = MethodDeclaration(ParseTaskReturnType(outArgs, AccessMode.Read), $"{Pascalize(dBusMethod.Name.AsSpan())}Async")
                     .AddModifiers(Token(SyntaxKind.PublicKeyword));
 
                 if (inArgs is not null)
@@ -109,7 +121,8 @@ namespace Tmds.DBus.SourceGenerator
 
                 parameters = returnType is not null
                     ? parameters.AddParameters(
-                        Parameter(Identifier("handler"))
+                        Parameter(
+                                Identifier("handler"))
                             .WithType(
                                 GenericName("Action")
                                     .AddTypeArgumentListArguments(
@@ -117,7 +130,8 @@ namespace Tmds.DBus.SourceGenerator
                                             IdentifierName("Exception")),
                                 returnType)))
                     : parameters.AddParameters(
-                        Parameter(Identifier("handler"))
+                        Parameter(
+                                Identifier("handler"))
                             .WithType(
                                 GenericName("Action")
                                     .AddTypeArgumentListArguments(
@@ -125,17 +139,28 @@ namespace Tmds.DBus.SourceGenerator
                                             IdentifierName("Exception")))));
 
                 parameters = parameters.AddParameters(
-                    Parameter(Identifier("emitOnCapturedContext"))
-                        .WithType(PredefinedType(Token(SyntaxKind.BoolKeyword)))
-                        .WithDefault(EqualsValueClause(LiteralExpression(SyntaxKind.TrueLiteralExpression))),
-                    Parameter(Identifier("flags"))
-                        .WithType(IdentifierName("ObserverFlags"))
-                        .WithDefault(EqualsValueClause(MakeMemberAccessExpression("ObserverFlags", "None"))));
+                    Parameter(
+                            Identifier("emitOnCapturedContext"))
+                        .WithType(
+                            PredefinedType(
+                                Token(SyntaxKind.BoolKeyword)))
+                        .WithDefault(
+                            EqualsValueClause(
+                                LiteralExpression(SyntaxKind.TrueLiteralExpression))),
+                    Parameter(
+                            Identifier("flags"))
+                        .WithType(
+                            IdentifierName("ObserverFlags"))
+                        .WithDefault(
+                            EqualsValueClause(
+                                MakeMemberAccessExpression("ObserverFlags", "None"))));
 
                 ArgumentListSyntax arguments = ArgumentList()
                     .AddArguments(
-                        Argument(IdentifierName("_connection")),
-                        Argument(IdentifierName("rule")));
+                        Argument(
+                            IdentifierName("_connection")),
+                        Argument(
+                            IdentifierName("rule")));
 
                 if (outArgs is not null)
                 {
@@ -145,16 +170,20 @@ namespace Tmds.DBus.SourceGenerator
                 }
 
                 arguments = arguments.AddArguments(
-                    Argument(IdentifierName("handler")),
-                    Argument(IdentifierName("emitOnCapturedContext")),
-                    Argument(IdentifierName("flags")));
+                    Argument(
+                        IdentifierName("handler")),
+                    Argument(
+                        IdentifierName("emitOnCapturedContext")),
+                    Argument(
+                        IdentifierName("flags")));
 
                 MethodDeclarationSyntax watchSignalMethod = MethodDeclaration(
                         GenericName("ValueTask")
                             .AddTypeArgumentListArguments(
                                 IdentifierName("IDisposable")),
-                        $"Watch{Pascalize(dBusSignal.Name!)}Async")
-                    .AddModifiers(Token(SyntaxKind.PublicKeyword))
+                        $"Watch{Pascalize(dBusSignal.Name.AsSpan())}Async")
+                    .AddModifiers(
+                        Token(SyntaxKind.PublicKeyword))
                     .WithParameterList(parameters)
                     .WithBody(
                         Block(
@@ -178,11 +207,16 @@ namespace Tmds.DBus.SourceGenerator
                 .WithInitializer(
                     InitializerExpression(SyntaxKind.ObjectInitializerExpression)
                         .AddExpressions(
-                            MakeAssignmentExpression(IdentifierName("Type"), MakeMemberAccessExpression("MessageType", "Signal")),
-                            MakeAssignmentExpression(IdentifierName("Sender"), IdentifierName("_destination")),
-                            MakeAssignmentExpression(IdentifierName("Path"), IdentifierName("_path")),
-                            MakeAssignmentExpression(IdentifierName("Member"), MakeLiteralExpression(dBusSignal.Name!)),
-                            MakeAssignmentExpression(IdentifierName("Interface"), IdentifierName("Interface"))));
+                            MakeAssignmentExpression(
+                                IdentifierName("Type"), MakeMemberAccessExpression("MessageType", "Signal")),
+                            MakeAssignmentExpression(
+                                IdentifierName("Sender"), IdentifierName("_destination")),
+                            MakeAssignmentExpression(
+                                IdentifierName("Path"), IdentifierName("_path")),
+                            MakeAssignmentExpression(
+                                IdentifierName("Member"), MakeLiteralExpression(dBusSignal.Name!)),
+                            MakeAssignmentExpression(
+                                IdentifierName("Interface"), IdentifierName("Interface"))));
 
         private void AddWatchPropertiesChanged(ref ClassDeclarationSyntax cl, DBusInterface dBusInterface) =>
             cl = cl.AddMembers(
@@ -191,10 +225,12 @@ namespace Tmds.DBus.SourceGenerator
                             .AddTypeArgumentListArguments(
                                 IdentifierName("IDisposable")),
                         "WatchPropertiesChangedAsync")
-                    .AddModifiers(Token(SyntaxKind.PublicKeyword))
+                    .AddModifiers(
+                        Token(SyntaxKind.PublicKeyword))
                     .AddParameterListParameters(
                         Parameter(Identifier("handler"))
-                            .WithType(GenericName("Action")
+                            .WithType(
+                                GenericName("Action")
                                 .AddTypeArgumentListArguments(
                                     NullableType(
                                         IdentifierName("Exception")),
@@ -202,13 +238,18 @@ namespace Tmds.DBus.SourceGenerator
                                         .AddTypeArgumentListArguments(
                                             IdentifierName(
                                                 GetPropertiesClassIdentifier(dBusInterface))))),
-                        Parameter(Identifier("emitOnCapturedContext"))
-                            .WithType(PredefinedType(Token(SyntaxKind.BoolKeyword)))
+                        Parameter(
+                                Identifier("emitOnCapturedContext"))
+                            .WithType(
+                                PredefinedType(
+                                    Token(SyntaxKind.BoolKeyword)))
                             .WithDefault(
                                 EqualsValueClause(
                                     LiteralExpression(SyntaxKind.TrueLiteralExpression))),
-                        Parameter(Identifier("flags"))
-                            .WithType(IdentifierName("ObserverFlags"))
+                        Parameter(
+                                Identifier("flags"))
+                            .WithType(
+                                IdentifierName("ObserverFlags"))
                             .WithDefault(
                                 EqualsValueClause(
                                     MakeMemberAccessExpression("ObserverFlags", "None"))))
@@ -218,25 +259,36 @@ namespace Tmds.DBus.SourceGenerator
                                 InvocationExpression(
                                         MakeMemberAccessExpression("SignalHelper", "WatchPropertiesChangedAsync"))
                                     .AddArgumentListArguments(
-                                        Argument(IdentifierName("_connection")),
-                                        Argument(IdentifierName("_destination")),
+                                        Argument(
+                                            IdentifierName("_connection")),
+                                        Argument(
+                                            IdentifierName("_destination")),
                                         Argument(IdentifierName("_path")),
-                                        Argument(IdentifierName("Interface")),
-                                        Argument(IdentifierName("ReadMessage")),
-                                        Argument(IdentifierName("handler")),
-                                        Argument(IdentifierName("emitOnCapturedContext")),
-                                        Argument(IdentifierName("flags")))),
+                                        Argument(
+                                            IdentifierName("Interface")),
+                                        Argument(
+                                            IdentifierName("ReadMessage")),
+                                        Argument(
+                                            IdentifierName("handler")),
+                                        Argument(
+                                            IdentifierName("emitOnCapturedContext")),
+                                        Argument(
+                                            IdentifierName("flags")))),
                             LocalFunctionStatement(
                                     GenericName("PropertyChanges")
                                         .AddTypeArgumentListArguments(
                                             IdentifierName(
                                                 GetPropertiesClassIdentifier(dBusInterface))),
                                     "ReadMessage")
-                                .AddModifiers(Token(SyntaxKind.StaticKeyword))
+                                .AddModifiers(
+                                    Token(SyntaxKind.StaticKeyword))
                                 .AddParameterListParameters(
-                                    Parameter(Identifier("message"))
-                                        .WithType(IdentifierName("Message")),
-                                    Parameter(Identifier("_"))
+                                    Parameter(
+                                            Identifier("message"))
+                                        .WithType(
+                                            IdentifierName("Message")),
+                                    Parameter(
+                                            Identifier("_"))
                                         .WithType(
                                             NullableType(
                                                 PredefinedType(Token(SyntaxKind.ObjectKeyword)))))
@@ -282,7 +334,7 @@ namespace Tmds.DBus.SourceGenerator
                                                     Argument(
                                                         InvocationExpression(
                                                             MakeMemberAccessExpression("reader",
-                                                                GetOrAddReadMethod(new DBusValue { Type = "as" })))))))))));
+                                                                GetOrAddReadMethod(DBusDotnetType.StringArrayType)))))))))));
 
         private void AddProperties(ref ClassDeclarationSyntax cl, DBusInterface dBusInterface)
         {
@@ -305,15 +357,20 @@ namespace Tmds.DBus.SourceGenerator
 
         private MethodDeclarationSyntax MakeGetMethod(DBusProperty dBusProperty)
         {
-            BlockSyntax createMessageBody = MakeCreateMessageBody(MakeLiteralExpression("org.freedesktop.DBus.Properties"), "Get", "ss",
+            BlockSyntax createMessageBody = MakeCreateMessageBody(
+                MakeLiteralExpression("org.freedesktop.DBus.Properties"), "Get", "ss",
                 ExpressionStatement(
                     InvocationExpression(
                             MakeMemberAccessExpression("writer", "WriteString"))
-                        .AddArgumentListArguments(Argument(IdentifierName("Interface")))),
+                        .AddArgumentListArguments(
+                            Argument(
+                                IdentifierName("Interface")))),
                 ExpressionStatement(
                     InvocationExpression(
                             MakeMemberAccessExpression("writer", "WriteString"))
-                        .AddArgumentListArguments(Argument(MakeLiteralExpression(dBusProperty.Name!)))));
+                        .AddArgumentListArguments(
+                            Argument(
+                                MakeLiteralExpression(dBusProperty.Name!)))));
 
             ArgumentListSyntax args = ArgumentList()
                 .AddArguments(
@@ -323,7 +380,8 @@ namespace Tmds.DBus.SourceGenerator
                         Argument(
                             MakeMemberAccessExpression("ReaderExtensions", GetOrAddReadMessageMethod(dBusProperty, true))));
 
-                return MethodDeclaration(ParseTaskReturnType([dBusProperty], AccessMode.Read), $"Get{Pascalize(dBusProperty.Name!)}PropertyAsync")
+                return MethodDeclaration(
+                        ParseTaskReturnType([dBusProperty], AccessMode.Read), $"Get{Pascalize(dBusProperty.Name.AsSpan())}PropertyAsync")
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .WithBody(
                     MakeCallMethodReturnBody(args, createMessageBody));
@@ -331,19 +389,27 @@ namespace Tmds.DBus.SourceGenerator
 
         private MethodDeclarationSyntax MakeSetMethod(DBusProperty dBusProperty)
         {
-            BlockSyntax createMessageBody = MakeCreateMessageBody(MakeLiteralExpression("org.freedesktop.DBus.Properties"), "Set", "ssv",
+            BlockSyntax createMessageBody = MakeCreateMessageBody(
+                MakeLiteralExpression("org.freedesktop.DBus.Properties"), "Set", "ssv",
                 ExpressionStatement(
                     InvocationExpression(
                             MakeMemberAccessExpression("writer", "WriteString"))
-                        .AddArgumentListArguments(Argument(IdentifierName("Interface")))),
+                        .AddArgumentListArguments(
+                            Argument(
+                                IdentifierName("Interface")))),
                 ExpressionStatement(
                     InvocationExpression(
                             MakeMemberAccessExpression("writer", "WriteString"))
-                        .AddArgumentListArguments(Argument(MakeLiteralExpression(Pascalize(dBusProperty.Name!))))),
+                        .AddArgumentListArguments(
+                            Argument(
+                                MakeLiteralExpression(
+                                    Pascalize(dBusProperty.Name.AsSpan()))))),
                 ExpressionStatement(
                     InvocationExpression(
                             MakeMemberAccessExpression("writer", GetOrAddWriteVariantMethod(dBusProperty)))
-                        .AddArgumentListArguments(Argument(IdentifierName("value")))));
+                        .AddArgumentListArguments(
+                            Argument(
+                                IdentifierName("value")))));
 
             ArgumentListSyntax args = ArgumentList(
                 SingletonSeparatedList(
@@ -353,30 +419,41 @@ namespace Tmds.DBus.SourceGenerator
 
             return MethodDeclaration(
                     IdentifierName("Task"),
-                    $"Set{Pascalize(dBusProperty.Name!)}PropertyAsync")
-                .AddModifiers(Token(SyntaxKind.PublicKeyword))
+                    $"Set{Pascalize(dBusProperty.Name.AsSpan())}PropertyAsync")
+                .AddModifiers(
+                    Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(
-                    Parameter(Identifier("value"))
-                        .WithType(GetDotnetType(dBusProperty, AccessMode.Write)))
+                    Parameter(
+                            Identifier("value"))
+                        .WithType(
+                            dBusProperty.DBusDotnetType.ToTypeSyntax(AccessMode.Write)))
                 .WithBody(
                     MakeCallMethodReturnBody(args, createMessageBody));
         }
 
         private static void AddGetAllMethod(ref ClassDeclarationSyntax cl, DBusInterface dBusInterface)
         {
-            BlockSyntax createGetAllMessageBody = MakeCreateMessageBody(MakeLiteralExpression("org.freedesktop.DBus.Properties"), "GetAll", "s",
+            BlockSyntax createGetAllMessageBody = MakeCreateMessageBody(
+                MakeLiteralExpression("org.freedesktop.DBus.Properties"), "GetAll", "s",
                 ExpressionStatement(
                     InvocationExpression(
                             MakeMemberAccessExpression("writer", "WriteString"))
-                        .AddArgumentListArguments(Argument(IdentifierName("Interface")))));
+                        .AddArgumentListArguments(
+                            Argument(
+                                IdentifierName("Interface")))));
 
             ParenthesizedLambdaExpressionSyntax messageValueReaderLambda = ParenthesizedLambdaExpression()
                 .AddParameterListParameters(
-                    Parameter(Identifier("message"))
-                        .WithType(IdentifierName("Message")),
-                    Parameter(Identifier("state"))
+                    Parameter(
+                            Identifier("message"))
                         .WithType(
-                            NullableType(PredefinedType(Token(SyntaxKind.ObjectKeyword)))))
+                            IdentifierName("Message")),
+                    Parameter(
+                            Identifier("state"))
+                        .WithType(
+                            NullableType(
+                                PredefinedType(
+                                    Token(SyntaxKind.ObjectKeyword)))))
                 .WithBody(
                     Block(
                         LocalDeclarationStatement(
@@ -425,7 +502,10 @@ namespace Tmds.DBus.SourceGenerator
             propertiesClass = dBusInterface.Properties!.Aggregate(propertiesClass, static (current, property) =>
                 current.AddMembers(
                     MakeGetSetProperty(
-                        GetDotnetType(property, AccessMode.Read), Pascalize(property.Name!), Token(SyntaxKind.PublicKeyword))));
+                        DBusDotnetType.FromDBusValue(property)
+                            .ToTypeSyntax(AccessMode.Read),
+                        Pascalize(property.Name.AsSpan()),
+                        Token(SyntaxKind.PublicKeyword))));
 
             cl = cl.AddMembers(propertiesClass);
         }
@@ -507,9 +587,9 @@ namespace Tmds.DBus.SourceGenerator
                                                                         MakeLiteralExpression(property.Type!)))),
                                                         ExpressionStatement(
                                                             AssignmentExpression(SyntaxKind.SimpleAssignmentExpression,
-                                                                MakeMemberAccessExpression("props", Pascalize(property.Name!)),
+                                                                MakeMemberAccessExpression("props", Pascalize(property.Name.AsSpan())),
                                                                 InvocationExpression(
-                                                                    MakeMemberAccessExpression("reader", GetOrAddReadMethod(property))))),
+                                                                    MakeMemberAccessExpression("reader", GetOrAddReadMethod(DBusDotnetType.FromDBusValue(property)))))),
                                                         ExpressionStatement(
                                                             ConditionalAccessExpression(
                                                                 IdentifierName("changed"), InvocationExpression(
@@ -517,7 +597,8 @@ namespace Tmds.DBus.SourceGenerator
                                                                             IdentifierName("Add")))
                                                                     .AddArgumentListArguments(
                                                                         Argument(
-                                                                            MakeLiteralExpression(Pascalize(property.Name!)))))),
+                                                                            MakeLiteralExpression(
+                                                                                Pascalize(property.Name.AsSpan())))))),
                                                         BreakStatement())))))),
                             ReturnStatement(
                                 IdentifierName("props")))));
@@ -535,17 +616,21 @@ namespace Tmds.DBus.SourceGenerator
         {
             ArgumentListSyntax args = ArgumentList()
                 .AddArguments(
-                    Argument(IdentifierName("_destination")),
-                    Argument(IdentifierName("_path")),
+                    Argument(
+                        IdentifierName("_destination")),
+                    Argument(
+                        IdentifierName("_path")),
                     Argument(interfaceExpression),
-                    Argument(MakeLiteralExpression(methodName)));
+                    Argument(
+                        MakeLiteralExpression(methodName)));
 
             if (signature is not null)
                 args = args.AddArguments(Argument(MakeLiteralExpression(signature)));
 
             return Block(
                     LocalDeclarationStatement(
-                            VariableDeclaration(IdentifierName("MessageWriter"),
+                            VariableDeclaration(
+                                IdentifierName("MessageWriter"),
                                 SingletonSeparatedList(
                                     VariableDeclarator("writer")
                                         .WithInitializer(EqualsValueClause(

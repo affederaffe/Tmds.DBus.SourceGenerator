@@ -1,93 +1,11 @@
 using System;
+using System.Text;
 
 
 namespace Tmds.DBus.SourceGenerator
 {
     internal ref struct SignatureReader
     {
-        private ReadOnlySpan<byte> _signature;
-
-        public readonly ReadOnlySpan<byte> Signature => _signature;
-
-        public SignatureReader(ReadOnlySpan<byte> signature)
-        {
-            _signature = signature;
-        }
-
-        public bool TryRead(out DBusType type, out ReadOnlySpan<byte> innerSignature)
-        {
-            innerSignature = default;
-
-            if (_signature.IsEmpty)
-            {
-                type = DBusType.Invalid;
-                return false;
-            }
-
-            type = ReadSingleType(_signature, out int length);
-
-            if (length > 1)
-            {
-                innerSignature = type switch
-                {
-                    DBusType.Array => _signature.Slice(1, length - 1),
-                    DBusType.Struct or DBusType.DictEntry => _signature.Slice(1, length - 2),
-                    _ => innerSignature
-                };
-            }
-
-            _signature = _signature.Slice(length);
-
-            return true;
-        }
-
-        private static DBusType ReadSingleType(ReadOnlySpan<byte> signature, out int length)
-        {
-            length = 0;
-
-            if (signature.IsEmpty)
-                return DBusType.Invalid;
-
-            DBusType type = (DBusType)signature[0];
-
-            if (IsBasicType(type))
-                length = 1;
-            else
-            {
-                switch (type)
-                {
-                    case DBusType.Variant:
-                        length = 1;
-                        break;
-                    case DBusType.Array when ReadSingleType(signature.Slice(1), out int elementLength) != DBusType.Invalid:
-                        type = DBusType.Array;
-                        length = elementLength + 1;
-                        break;
-                    case DBusType.Array:
-                        type = DBusType.Invalid;
-                        break;
-                    case DBusType.Struct:
-                        length = DetermineLength(signature.Slice(1), (byte)'(', (byte)')');
-                        if (length == 0)
-                            type = DBusType.Invalid;
-                        break;
-                    case DBusType.DictEntry:
-                        length = DetermineLength(signature.Slice(1), (byte)'{', (byte)'}');
-                        if (length < 4 ||
-                            !IsBasicType((DBusType)signature[1]) ||
-                            ReadSingleType(signature.Slice(2), out int valueTypeLength) == DBusType.Invalid ||
-                            length != valueTypeLength + 3)
-                            type = DBusType.Invalid;
-                        break;
-                    default:
-                        type = DBusType.Invalid;
-                        break;
-                }
-            }
-
-            return type;
-        }
-
         private static int DetermineLength(ReadOnlySpan<byte> span, byte startChar, byte endChar)
         {
             int length = 1;
@@ -109,8 +27,6 @@ namespace Tmds.DBus.SourceGenerator
 
             return length;
         }
-
-        private static bool IsBasicType(DBusType type) => type is DBusType.Byte or DBusType.Bool or DBusType.Int16 or DBusType.UInt16 or DBusType.Int32 or DBusType.UInt32 or DBusType.Int64 or DBusType.UInt64 or DBusType.Double or DBusType.String or DBusType.ObjectPath or DBusType.Signature or DBusType.UnixFd;
 
         private static ReadOnlySpan<byte> ReadSingleType(ref ReadOnlySpan<byte> signature)
         {
@@ -141,26 +57,29 @@ namespace Tmds.DBus.SourceGenerator
             return rv;
         }
 
-        public static T Transform<T>(ReadOnlySpan<byte> signature, Func<DBusType, T[], T> map)
+        public static T Transform<T>(ReadOnlySpan<byte> signature, Func<DBusType, string?, T[], T> map)
         {
             DBusType dbusType = signature.Length == 0 ? DBusType.Invalid : (DBusType)signature[0];
 
             switch (dbusType)
             {
                 case DBusType.Array when (DBusType)signature[1] == DBusType.DictEntry:
+                    string sig = Encoding.UTF8.GetString(signature.ToArray());
                     signature = signature.Slice(2);
                     ReadOnlySpan<byte> keySignature = ReadSingleType(ref signature);
                     ReadOnlySpan<byte> valueSignature = ReadSingleType(ref signature);
                     signature = signature.Slice(1);
                     T keyType = Transform(keySignature, map);
                     T valueType = Transform(valueSignature, map);
-                    return map(DBusType.DictEntry, [keyType, valueType]);
+                    return map(DBusType.DictEntry, sig, [keyType, valueType]);
                 case DBusType.Array:
+                    sig = Encoding.UTF8.GetString(signature.ToArray());
                     signature = signature.Slice(1);
                     T elementType = Transform(signature, map);
                     //signature = signature.Slice(1);
-                    return map(DBusType.Array, [elementType]);
+                    return map(DBusType.Array, sig, [elementType]);
                 case DBusType.Struct:
+                    sig = Encoding.UTF8.GetString(signature.ToArray());
                     signature = signature.Slice(1, signature.Length - 2);
                     int typeCount = CountTypes(signature);
                     T[] innerTypes = new T[typeCount];
@@ -170,9 +89,9 @@ namespace Tmds.DBus.SourceGenerator
                         innerTypes[i] = Transform(innerTypeSignature, map);
                     }
 
-                    return map(DBusType.Struct, innerTypes);
+                    return map(DBusType.Struct, sig, innerTypes);
                 default:
-                    return map(dbusType, []);
+                    return map(dbusType, null, []);
             }
         }
 
