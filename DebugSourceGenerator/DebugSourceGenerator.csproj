@@ -27,6 +27,7 @@
         <AdditionalFiles Include="DBusXml/org.freedesktop.portal.Settings.xml" DBusGeneratorMode="Proxy" />
 
         <AdditionalFiles Include="DBusXml/org.freedesktop.NetworkManager.xml" DBusGeneratorMode="Proxy" />
+        <AdditionalFiles Include="DBusXml/org.freedesktop.NetworkManager.IP4Config.xml" DBusGeneratorMode="Proxy" />
 
         <AdditionalFiles Include="DBusXml/org.freedesktop.ModemManager1.Bearer.xml" DBusGeneratorMode="Proxy" />
 
@@ -38,7 +39,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="Tmds.DBus.Protocol" Version="0.20.0" />
+        <PackageReference Include="Tmds.DBus.Protocol" Version="0.21.2" />
         <ProjectReference Include="../Tmds.DBus.SourceGenerator/Tmds.DBus.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     </ItemGroup>
 
