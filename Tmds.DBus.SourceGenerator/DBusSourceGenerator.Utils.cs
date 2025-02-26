@@ -163,7 +163,7 @@ namespace Tmds.DBus.SourceGenerator
                 return identifier;
 
             _readMethodExtensions.Add(identifier,
-                MethodDeclaration(dBusDotnetType.ToTypeSyntax(AccessMode.Read), identifier)
+                MethodDeclaration(dBusDotnetType.ToTypeSyntax(), identifier)
                     .AddModifiers(
                         Token(SyntaxKind.PublicKeyword),
                         Token(SyntaxKind.StaticKeyword))
@@ -182,7 +182,7 @@ namespace Tmds.DBus.SourceGenerator
                                     VariableDeclaration(
                                             GenericName("List")
                                             .AddTypeArgumentListArguments(
-                                                dBusDotnetType.InnerTypes[0].ToTypeSyntax(AccessMode.Read)))
+                                                dBusDotnetType.InnerTypes[0].ToTypeSyntax()))
                                         .AddVariables(
                                             VariableDeclarator("items")
                                                 .WithInitializer(
@@ -226,7 +226,7 @@ namespace Tmds.DBus.SourceGenerator
             if (_readMethodExtensions.ContainsKey(identifier))
                 return identifier;
 
-            TypeSyntax type = dBusDotnetType.ToTypeSyntax(AccessMode.Read);
+            TypeSyntax type = dBusDotnetType.ToTypeSyntax();
 
             _readMethodExtensions.Add(identifier,
                 MethodDeclaration(type, identifier)
@@ -291,7 +291,7 @@ namespace Tmds.DBus.SourceGenerator
             if (_readMethodExtensions.ContainsKey(identifier))
                 return identifier;
 
-            TypeSyntax type = dBusDotnetType.ToTypeSyntax(AccessMode.Read);
+            TypeSyntax type = dBusDotnetType.ToTypeSyntax();
 
             _readMethodExtensions.Add(identifier,
                 MethodDeclaration(type, identifier)
@@ -374,7 +374,7 @@ namespace Tmds.DBus.SourceGenerator
                     block = block.AddStatements(
                         LocalDeclarationStatement(
                             VariableDeclaration(
-                                    dBusValues[i].DBusDotnetType.ToTypeSyntax(AccessMode.Read))
+                                    dBusValues[i].DBusDotnetType.ToTypeSyntax())
                                 .AddVariables(
                                     VariableDeclarator($"arg{i}")
                                         .WithInitializer(
@@ -394,7 +394,7 @@ namespace Tmds.DBus.SourceGenerator
 
             _readMethodExtensions.Add(identifier,
                 MethodDeclaration(
-                        ParseReturnType(dBusValues, AccessMode.Read), identifier)
+                        ParseReturnType(dBusValues), identifier)
                     .AddModifiers(
                         Token(SyntaxKind.PublicKeyword),
                         Token(SyntaxKind.StaticKeyword))
@@ -437,7 +437,7 @@ namespace Tmds.DBus.SourceGenerator
                         Parameter(
                                 Identifier("value"))
                             .WithType(
-                                dBusValue.DBusDotnetType.ToTypeSyntax(AccessMode.Write)))
+                                dBusValue.DBusDotnetType.ToTypeSyntax()))
                     .WithBody(
                         Block(
                                 SingletonList(
@@ -483,7 +483,7 @@ namespace Tmds.DBus.SourceGenerator
                                 Token(SyntaxKind.RefKeyword)),
                         Parameter(
                                 Identifier("values"))
-                            .WithType(dBusDotnetType.ToTypeSyntax(AccessMode.Write, true)))
+                            .WithType(dBusDotnetType.ToTypeSyntax(true)))
                     .WithBody(
                         Block()
                             .AddStatements(
@@ -505,7 +505,7 @@ namespace Tmds.DBus.SourceGenerator
                                             ConstantPattern(
                                                 LiteralExpression(SyntaxKind.NullLiteralExpression)))),
                                     ForEachStatement(
-                                        dBusDotnetType.InnerTypes[0].ToTypeSyntax(AccessMode.Write, true),
+                                        dBusDotnetType.InnerTypes[0].ToTypeSyntax(true),
                                         "value",
                                         IdentifierName("values"),
                                         ExpressionStatement(
@@ -543,7 +543,7 @@ namespace Tmds.DBus.SourceGenerator
                                 Token(SyntaxKind.RefKeyword)),
                         Parameter(
                                 Identifier("values"))
-                            .WithType(dBusDotnetType.ToTypeSyntax(AccessMode.Write, true)))
+                            .WithType(dBusDotnetType.ToTypeSyntax(true)))
                     .WithBody(
                         Block()
                             .AddStatements(
@@ -567,8 +567,8 @@ namespace Tmds.DBus.SourceGenerator
                                     ForEachStatement(
                                         GenericName("KeyValuePair")
                                             .AddTypeArgumentListArguments(
-                                                dBusDotnetType.InnerTypes[0].ToTypeSyntax(AccessMode.Write, true),
-                                                dBusDotnetType.InnerTypes[1].ToTypeSyntax(AccessMode.Write, true)),
+                                                dBusDotnetType.InnerTypes[0].ToTypeSyntax(true),
+                                                dBusDotnetType.InnerTypes[1].ToTypeSyntax(true)),
                                         "value",
                                         IdentifierName("values"),
                                         Block(
@@ -620,7 +620,7 @@ namespace Tmds.DBus.SourceGenerator
                                 Token(SyntaxKind.RefKeyword)),
                         Parameter(
                                 Identifier("value"))
-                            .WithType(dBusDotnetType.ToTypeSyntax(AccessMode.Write, true)))
+                            .WithType(dBusDotnetType.ToTypeSyntax(true)))
                     .WithBody(
                         Block(
                                 ExpressionStatement(

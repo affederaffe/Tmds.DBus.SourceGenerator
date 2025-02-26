@@ -118,7 +118,7 @@ namespace Tmds.DBus.SourceGenerator
                 string abstractMethodName = $"On{Pascalize(dBusMethod.Name.AsSpan())}Async";
 
                 MethodDeclarationSyntax abstractMethod = MethodDeclaration(
-                        ParseValueTaskReturnType(outArgs, AccessMode.Write), abstractMethodName)
+                        ParseValueTaskReturnType(outArgs), abstractMethodName)
                     .WithParameterList(
                         ParameterList(
                             SingletonSeparatedList(
@@ -135,7 +135,7 @@ namespace Tmds.DBus.SourceGenerator
                 if (inArgs?.Length > 0)
                 {
                     abstractMethod = abstractMethod.AddParameterListParameters(
-                        ParseParameterList(inArgs, AccessMode.Read));
+                        ParseParameterList(inArgs));
                 }
 
                 cl = cl.AddMembers(abstractMethod);
@@ -155,13 +155,15 @@ namespace Tmds.DBus.SourceGenerator
 
                     for (int i = 0; i < inArgs.Length; i++)
                     {
-                        string identifier = inArgs[i].Name is not null ? SanitizeIdentifier(Camelize(inArgs[i].Name.AsSpan())) : $"arg{i}";
+                        string identifier = inArgs[i].Name is not null
+                            ? SanitizeIdentifier(Camelize(inArgs[i].Name.AsSpan()))
+                            : $"arg{i}";
                         readParametersMethodBlock = readParametersMethodBlock.AddStatements(
                             ExpressionStatement(
                                 AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(identifier), InvocationExpression(
                                     MakeMemberAccessExpression("reader", GetOrAddReadMethod(inArgs[i].DBusDotnetType))))));
                         argFields[i] = LocalDeclarationStatement(
-                            VariableDeclaration(inArgs[i].DBusDotnetType.ToTypeSyntax(AccessMode.Read))
+                            VariableDeclaration(inArgs[i].DBusDotnetType.ToTypeSyntax())
                                 .AddVariables(
                                     VariableDeclarator(identifier)));
                     }
@@ -180,7 +182,8 @@ namespace Tmds.DBus.SourceGenerator
                 {
                     switchSectionBlock = switchSectionBlock.AddStatements(
                         LocalDeclarationStatement(
-                            VariableDeclaration(ParseReturnType(outArgs, AccessMode.Write))
+                            VariableDeclaration(
+                                    ParseReturnType(outArgs))
                                 .AddVariables(
                                     VariableDeclarator("ret"))));
                 }
@@ -205,11 +208,13 @@ namespace Tmds.DBus.SourceGenerator
                 switchSectionBlock = switchSectionBlock.AddStatements(
                         IfStatement(
                         IsPatternExpression(
-                            IdentifierName("_synchronizationContext"), UnaryPattern(ConstantPattern(LiteralExpression(SyntaxKind.NullLiteralExpression)))),
+                            IdentifierName("_synchronizationContext"), UnaryPattern(
+                                ConstantPattern(
+                                    LiteralExpression(SyntaxKind.NullLiteralExpression)))),
                         Block(
                             LocalDeclarationStatement(
                                 VariableDeclaration(
-                                        ParseTaskCompletionSourceType(outArgs, AccessMode.Write))
+                                        ParseTaskCompletionSourceType(outArgs))
                                     .AddVariables(
                                         VariableDeclarator("tsc")
                                             .WithInitializer(
@@ -231,7 +236,7 @@ namespace Tmds.DBus.SourceGenerator
                                                                 outArgs?.Length > 0
                                                                     ? LocalDeclarationStatement(
                                                                     VariableDeclaration(
-                                                                            ParseReturnType(outArgs, AccessMode.Write))
+                                                                            ParseReturnType(outArgs))
                                                                         .AddVariables(
                                                                             VariableDeclarator("ret1")
                                                                                 .WithInitializer(
@@ -383,7 +388,7 @@ namespace Tmds.DBus.SourceGenerator
 
             MemberDeclarationSyntax[] properties = dBusInterface.Properties.Select(static property =>
                     MakeGetSetProperty(
-                        property.DBusDotnetType.ToTypeSyntax(AccessMode.Write, true),
+                        property.DBusDotnetType.ToTypeSyntax(true),
                         Pascalize(property.Name.AsSpan()),
                         property.Access is "write" or "readwrite"
                             ? [Token(SyntaxKind.PublicKeyword), Token(SyntaxKind.AbstractKeyword)]
@@ -651,7 +656,7 @@ namespace Tmds.DBus.SourceGenerator
                                                 Camelize(argument.Name.AsSpan()))
                                             : $"arg{i}"))
                                         .WithType(
-                                            argument.DBusDotnetType.ToTypeSyntax(AccessMode.Write, true))))));
+                                            argument.DBusDotnetType.ToTypeSyntax(true))))));
                 }
 
                 BlockSyntax body = Block();

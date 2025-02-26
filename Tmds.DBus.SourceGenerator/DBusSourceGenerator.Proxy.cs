@@ -90,9 +90,11 @@ namespace Tmds.DBus.SourceGenerator
                     .Cast<StatementSyntax>()
                     .ToArray() ?? [];
 
-                BlockSyntax createMessageBody = MakeCreateMessageBody(IdentifierName("Interface"), dBusMethod.Name!, ParseSignature(inArgs), statements);
+                BlockSyntax createMessageBody = MakeCreateMessageBody(
+                    IdentifierName("Interface"), dBusMethod.Name!, ParseSignature(inArgs), statements);
 
-                MethodDeclarationSyntax proxyMethod = MethodDeclaration(ParseTaskReturnType(outArgs, AccessMode.Read), $"{Pascalize(dBusMethod.Name.AsSpan())}Async")
+                MethodDeclarationSyntax proxyMethod = MethodDeclaration(
+                        ParseTaskReturnType(outArgs), $"{Pascalize(dBusMethod.Name.AsSpan())}Async")
                     .AddModifiers(Token(SyntaxKind.PublicKeyword));
 
                 if (inArgs is not null)
@@ -100,7 +102,7 @@ namespace Tmds.DBus.SourceGenerator
                     proxyMethod = proxyMethod.WithParameterList(
                         ParameterList(
                             SeparatedList(
-                                ParseParameterList(inArgs, AccessMode.Write))));
+                                ParseParameterList(inArgs))));
                 }
 
                 cl = cl.AddMembers(proxyMethod.WithBody(MakeCallMethodReturnBody(args, createMessageBody)));
@@ -115,7 +117,7 @@ namespace Tmds.DBus.SourceGenerator
             foreach (DBusSignal dBusSignal in dBusInterface.Signals)
             {
                 DBusArgument[]? outArgs = dBusSignal.Arguments?.Where(static x => x.Direction is null or "out").ToArray();
-                TypeSyntax? returnType = ParseReturnType(outArgs, AccessMode.Read);
+                TypeSyntax? returnType = ParseReturnType(outArgs);
 
                 ParameterListSyntax parameters = ParameterList();
 
@@ -378,10 +380,11 @@ namespace Tmds.DBus.SourceGenerator
                         InvocationExpression(
                             IdentifierName("CreateMessage"))),
                         Argument(
-                            MakeMemberAccessExpression("ReaderExtensions", GetOrAddReadMessageMethod(dBusProperty, true))));
+                            MakeMemberAccessExpression(
+                                "ReaderExtensions", GetOrAddReadMessageMethod(dBusProperty, true))));
 
                 return MethodDeclaration(
-                        ParseTaskReturnType([dBusProperty], AccessMode.Read), $"Get{Pascalize(dBusProperty.Name.AsSpan())}PropertyAsync")
+                        ParseTaskReturnType([dBusProperty]), $"Get{Pascalize(dBusProperty.Name.AsSpan())}PropertyAsync")
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .WithBody(
                     MakeCallMethodReturnBody(args, createMessageBody));
@@ -426,7 +429,7 @@ namespace Tmds.DBus.SourceGenerator
                     Parameter(
                             Identifier("value"))
                         .WithType(
-                            dBusProperty.DBusDotnetType.ToTypeSyntax(AccessMode.Write)))
+                            dBusProperty.DBusDotnetType.ToTypeSyntax()))
                 .WithBody(
                     MakeCallMethodReturnBody(args, createMessageBody));
         }
@@ -503,7 +506,7 @@ namespace Tmds.DBus.SourceGenerator
                 current.AddMembers(
                     MakeGetSetProperty(
                         DBusDotnetType.FromDBusValue(property)
-                            .ToTypeSyntax(AccessMode.Read),
+                            .ToTypeSyntax(),
                         Pascalize(property.Name.AsSpan()),
                         Token(SyntaxKind.PublicKeyword))));
 

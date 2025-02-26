@@ -61,14 +61,14 @@ namespace Tmds.DBus.SourceGenerator
         }
 
         [return: NotNullIfNotNull("dbusValues")]
-        private static TypeSyntax? ParseReturnType(IReadOnlyList<DBusValue>? dbusValues, AccessMode accessMode) => dbusValues?.Count switch
+        private static TypeSyntax? ParseReturnType(IReadOnlyList<DBusValue>? dbusValues) => dbusValues?.Count switch
         {
             0 or null => null,
-            1 => dbusValues[0].DBusDotnetType.ToTypeSyntax(accessMode),
+            1 => dbusValues[0].DBusDotnetType.ToTypeSyntax(),
             _ => TupleType()
                 .AddElements(
                     dbusValues.Select((dbusValue, i) => TupleElement(
-                                dbusValue.DBusDotnetType.ToTypeSyntax(accessMode))
+                                dbusValue.DBusDotnetType.ToTypeSyntax())
                             .WithIdentifier(
                                 Identifier(dbusValue.Name is not null
                                     ? SanitizeIdentifier(
@@ -77,23 +77,23 @@ namespace Tmds.DBus.SourceGenerator
                         .ToArray())
         };
 
-        private static TypeSyntax ParseTaskReturnType(IReadOnlyList<DBusValue>? dbusValues, AccessMode accessMode) => dbusValues?.Count switch
+        private static TypeSyntax ParseTaskReturnType(IReadOnlyList<DBusValue>? dbusValues) => dbusValues?.Count switch
         {
             0 or null => IdentifierName("Task"),
             _ => GenericName("Task")
                 .AddTypeArgumentListArguments(
-                    ParseReturnType(dbusValues, accessMode))
+                    ParseReturnType(dbusValues))
         };
 
-        private static TypeSyntax ParseValueTaskReturnType(IReadOnlyList<DBusValue>? dbusValues, AccessMode accessMode) => dbusValues?.Count switch
+        private static TypeSyntax ParseValueTaskReturnType(IReadOnlyList<DBusValue>? dbusValues) => dbusValues?.Count switch
         {
             0 or null => IdentifierName("ValueTask"),
             _ => GenericName("ValueTask")
                 .AddTypeArgumentListArguments(
-                    ParseReturnType(dbusValues, accessMode))
+                    ParseReturnType(dbusValues))
         };
 
-        private static TypeSyntax ParseTaskCompletionSourceType(IReadOnlyList<DBusValue>? dbusValues, AccessMode accessMode) => dbusValues?.Count switch
+        private static TypeSyntax ParseTaskCompletionSourceType(IReadOnlyList<DBusValue>? dbusValues) => dbusValues?.Count switch
         {
             0 or null => GenericName("TaskCompletionSource")
                 .AddTypeArgumentListArguments(
@@ -101,17 +101,17 @@ namespace Tmds.DBus.SourceGenerator
                         Token(SyntaxKind.BoolKeyword))),
             _ => GenericName("TaskCompletionSource")
                 .AddTypeArgumentListArguments(
-                    ParseReturnType(dbusValues, accessMode))
+                    ParseReturnType(dbusValues))
         };
 
-        private static ParameterSyntax[] ParseParameterList(IReadOnlyList<DBusValue> inArgs, AccessMode accessMode) => inArgs.Select((dbusValue, i) =>
+        private static ParameterSyntax[] ParseParameterList(IReadOnlyList<DBusValue> inArgs) => inArgs.Select((dbusValue, i) =>
                 Parameter(
                         Identifier(dbusValue.Name is not null
                             ? SanitizeIdentifier(
                                 Camelize(dbusValue.Name.AsSpan()))
                             : $"arg{i}"))
                     .WithType(
-                        dbusValue.DBusDotnetType.ToTypeSyntax(accessMode)))
+                        dbusValue.DBusDotnetType.ToTypeSyntax()))
             .ToArray();
 
         private static string SanitizeSignature(in string signature) =>
@@ -183,8 +183,8 @@ namespace Tmds.DBus.SourceGenerator
 
             public DBusDotnetType[] InnerTypes { get; }
 
-            public TypeSyntax ToTypeSyntax(AccessMode accessMode, bool nullable = false) =>
-                ToTypeSyntax(DotnetType, InnerTypes, accessMode, nullable);
+            public TypeSyntax ToTypeSyntax(bool nullable = false) =>
+                ToTypeSyntax(DotnetType, InnerTypes, nullable);
 
             public static DBusDotnetType FromDBusValue(DBusValue dbusValue)
             {
@@ -235,7 +235,7 @@ namespace Tmds.DBus.SourceGenerator
                 }
             }
 
-            private static TypeSyntax ToTypeSyntax(DotnetType type, DBusDotnetType[]? innerTypes, AccessMode accessMode, bool nullable = false)
+            private static TypeSyntax ToTypeSyntax(DotnetType type, DBusDotnetType[]? innerTypes, bool nullable = false)
             {
                 switch (type)
                 {
@@ -276,15 +276,13 @@ namespace Tmds.DBus.SourceGenerator
                         return IdentifierName("ObjectPath");
                     case DotnetType.Signature:
                         return IdentifierName("Signature");
-                    case DotnetType.Variant when accessMode == AccessMode.Read:
+                    case DotnetType.Variant:
                         return IdentifierName("VariantValue");
-                    case DotnetType.Variant when accessMode == AccessMode.Write:
-                        return IdentifierName("Variant");
                     case DotnetType.SafeFileHandle:
                         return IdentifierName("SafeFileHandle");
                     case DotnetType.Array:
                         TypeSyntax arr = ArrayType(
-                                innerTypes![0].ToTypeSyntax(accessMode, nullable))
+                                innerTypes![0].ToTypeSyntax(nullable))
                             .AddRankSpecifiers(
                                 ArrayRankSpecifier()
                                     .AddSizes(
@@ -295,21 +293,21 @@ namespace Tmds.DBus.SourceGenerator
                     case DotnetType.Dictionary:
                         TypeSyntax dict = GenericName("Dictionary")
                             .AddTypeArgumentListArguments(
-                                innerTypes![0].ToTypeSyntax(accessMode),
-                                innerTypes[1].ToTypeSyntax(accessMode, nullable));
+                                innerTypes![0].ToTypeSyntax(),
+                                innerTypes[1].ToTypeSyntax(nullable));
                         if (nullable)
                             dict = NullableType(dict);
                         return dict;
                     case DotnetType.Tuple when innerTypes!.Length == 1:
                         return GenericName("ValueTuple")
                             .AddTypeArgumentListArguments(
-                                innerTypes[0].ToTypeSyntax(accessMode, nullable));
+                                innerTypes[0].ToTypeSyntax(nullable));
                     case DotnetType.Tuple:
                         return TupleType()
                             .AddElements(
                                 innerTypes.Select(
                                         innerType => TupleElement(
-                                            innerType.ToTypeSyntax(accessMode, nullable)))
+                                            innerType.ToTypeSyntax(nullable)))
                                     .ToArray());
                     default:
                         throw new ArgumentOutOfRangeException(nameof(type), type,$"Cannot parse DotnetType with value {type}");
