@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="DebugSourceGenerator/DebugSourceGenerator.csproj" />
+  <Project Path="Tmds.DBus.SourceGenerator/Tmds.DBus.SourceGenerator.csproj" />
+</Solution>
