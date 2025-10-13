@@ -17,6 +17,9 @@ namespace Tmds.DBus.SourceGenerator
     [Generator]
     public partial class DBusSourceGenerator : IIncrementalGenerator
     {
+        private readonly object _readMethodExtensionsLock = new();
+        private readonly object _writeMethodExtensionsLock = new();
+
         private Dictionary<string, MethodDeclarationSyntax> _readMethodExtensions = null!;
         private Dictionary<string, MethodDeclarationSyntax> _writeMethodExtensions = null!;
 
@@ -47,13 +50,12 @@ namespace Tmds.DBus.SourceGenerator
                 .Select((x, _) =>
                 {
                     if (!x.Right.GetOptions(x.Left).TryGetValue("build_metadata.AdditionalFiles.DBusGeneratorMode", out string? generatorMode))
-                        return null;
+                        return default;
                     if (xmlSerializer.Deserialize(XmlReader.Create(new StringReader(x.Left.GetText()!.ToString()), xmlReaderSettings)) is not DBusNode dBusNode)
-                        return null;
-                    return dBusNode.Interfaces is null ? null : Tuple.Create(dBusNode, generatorMode);
+                        return default;
+                    return dBusNode.Interfaces is null ? default : ValueTuple.Create(dBusNode, generatorMode);
                 })
-                .Where(static x => x is not null)
-                .Select(static (x, _) => x.ToValueTuple());
+                .Where(static x => x is { Item1: not null, Item2: not null });
 
             context.RegisterSourceOutput(generatorProvider.Collect(), (productionContext, provider) =>
             {

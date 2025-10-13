@@ -159,8 +159,10 @@ namespace Tmds.DBus.SourceGenerator
         private string GetOrAddReadArrayMethod(DBusDotnetType dBusDotnetType)
         {
             string identifier = $"ReadArray_{SanitizeSignature(dBusDotnetType.DBusTypeSignature)}";
-            if (_readMethodExtensions.ContainsKey(identifier))
-                return identifier;
+            lock (_writeMethodExtensionsLock)
+            {
+                if (_readMethodExtensions.ContainsKey(identifier))
+                    return identifier;
 
             _readMethodExtensions.Add(identifier,
                 MethodDeclaration(dBusDotnetType.ToTypeSyntax(), identifier)
@@ -217,116 +219,123 @@ namespace Tmds.DBus.SourceGenerator
                                         MakeMemberAccessExpression("items", "ToArray")))
                             )));
 
-            return identifier;
+                return identifier;
+            }
         }
 
         private string GetOrAddReadDictionaryMethod(DBusDotnetType dBusDotnetType)
         {
             string identifier = $"ReadDictionary_{SanitizeSignature(dBusDotnetType.DBusTypeSignature)}";
-            if (_readMethodExtensions.ContainsKey(identifier))
-                return identifier;
+            lock (_readMethodExtensionsLock)
+            {
+                if (_readMethodExtensions.ContainsKey(identifier))
+                    return identifier;
 
             TypeSyntax type = dBusDotnetType.ToTypeSyntax();
 
-            _readMethodExtensions.Add(identifier,
-                MethodDeclaration(type, identifier)
-                    .AddModifiers(
-                        Token(SyntaxKind.PublicKeyword),
-                        Token(SyntaxKind.StaticKeyword))
-                    .AddParameterListParameters(
-                        Parameter(
-                                Identifier("reader"))
-                            .WithType(
-                                IdentifierName("Reader"))
-                            .AddModifiers(
-                                Token(SyntaxKind.ThisKeyword),
-                                Token(SyntaxKind.RefKeyword)))
-                    .WithBody(
-                        Block()
-                            .AddStatements(
-                                LocalDeclarationStatement(
-                                    VariableDeclaration(type)
-                                        .AddVariables(
-                                            VariableDeclarator("items")
-                                                .WithInitializer(
-                                                    EqualsValueClause(
-                                                        ImplicitObjectCreationExpression())))),
-                                LocalDeclarationStatement(
-                                    VariableDeclaration(
-                                            IdentifierName("ArrayEnd"))
-                                        .AddVariables(
-                                            VariableDeclarator("headersEnd")
-                                                .WithInitializer(
-                                                    EqualsValueClause(
-                                                        InvocationExpression(
-                                                                MakeMemberAccessExpression("reader", "ReadArrayStart"))
-                                                            .AddArgumentListArguments(
-                                                                Argument(
-                                                                    MakeMemberAccessExpression("DBusType", "Struct"))))))),
-                                WhileStatement(
-                                    InvocationExpression(
-                                            MakeMemberAccessExpression("reader", "HasNext"))
-                                        .AddArgumentListArguments(
-                                            Argument(
-                                                IdentifierName("headersEnd"))),
-                                    ExpressionStatement(
+                _readMethodExtensions.Add(identifier,
+                    MethodDeclaration(type, identifier)
+                        .AddModifiers(
+                            Token(SyntaxKind.PublicKeyword),
+                            Token(SyntaxKind.StaticKeyword))
+                        .AddParameterListParameters(
+                            Parameter(
+                                    Identifier("reader"))
+                                .WithType(
+                                    IdentifierName("Reader"))
+                                .AddModifiers(
+                                    Token(SyntaxKind.ThisKeyword),
+                                    Token(SyntaxKind.RefKeyword)))
+                        .WithBody(
+                            Block()
+                                .AddStatements(
+                                    LocalDeclarationStatement(
+                                        VariableDeclaration(type)
+                                            .AddVariables(
+                                                VariableDeclarator("items")
+                                                    .WithInitializer(
+                                                        EqualsValueClause(
+                                                            ImplicitObjectCreationExpression())))),
+                                    LocalDeclarationStatement(
+                                        VariableDeclaration(
+                                                IdentifierName("ArrayEnd"))
+                                            .AddVariables(
+                                                VariableDeclarator("headersEnd")
+                                                    .WithInitializer(
+                                                        EqualsValueClause(
+                                                            InvocationExpression(
+                                                                    MakeMemberAccessExpression("reader", "ReadArrayStart"))
+                                                                .AddArgumentListArguments(
+                                                                    Argument(
+                                                                        MakeMemberAccessExpression("DBusType", "Struct"))))))),
+                                    WhileStatement(
                                         InvocationExpression(
-                                                MakeMemberAccessExpression("items", "Add"))
+                                                MakeMemberAccessExpression("reader", "HasNext"))
                                             .AddArgumentListArguments(
                                                 Argument(
-                                                    InvocationExpression(
-                                                        MakeMemberAccessExpression("reader", GetOrAddReadMethod(dBusDotnetType.InnerTypes[0])))),
-                                                Argument(
-                                                    InvocationExpression(
-                                                        MakeMemberAccessExpression("reader", GetOrAddReadMethod(dBusDotnetType.InnerTypes[1]))))))),
-                                ReturnStatement(
-                                    IdentifierName("items")))));
+                                                    IdentifierName("headersEnd"))),
+                                        ExpressionStatement(
+                                            InvocationExpression(
+                                                    MakeMemberAccessExpression("items", "Add"))
+                                                .AddArgumentListArguments(
+                                                    Argument(
+                                                        InvocationExpression(
+                                                            MakeMemberAccessExpression("reader", GetOrAddReadMethod(dBusDotnetType.InnerTypes[0])))),
+                                                    Argument(
+                                                        InvocationExpression(
+                                                            MakeMemberAccessExpression("reader", GetOrAddReadMethod(dBusDotnetType.InnerTypes[1]))))))),
+                                    ReturnStatement(
+                                        IdentifierName("items")))));
 
-            return identifier;
+                return identifier;
+            }
         }
 
         private string GetOrAddReadStructMethod(DBusDotnetType dBusDotnetType)
         {
             string identifier = $"ReadStruct_{SanitizeSignature(dBusDotnetType.DBusTypeSignature)}";
-            if (_readMethodExtensions.ContainsKey(identifier))
-                return identifier;
+            lock (_readMethodExtensions)
+            {
+                if (_readMethodExtensions.ContainsKey(identifier))
+                    return identifier;
 
             TypeSyntax type = dBusDotnetType.ToTypeSyntax();
 
-            _readMethodExtensions.Add(identifier,
-                MethodDeclaration(type, identifier)
-                    .AddModifiers(
-                        Token(SyntaxKind.PublicKeyword),
-                        Token(SyntaxKind.StaticKeyword))
-                    .AddParameterListParameters(
-                        Parameter(
-                                Identifier("reader"))
-                            .WithType(
-                                IdentifierName("Reader"))
-                            .AddModifiers(
-                                Token(SyntaxKind.ThisKeyword),
-                                Token(SyntaxKind.RefKeyword)))
-                    .WithBody(
-                        Block()
-                            .AddStatements(
-                                ExpressionStatement(
-                                    InvocationExpression(
-                                        MakeMemberAccessExpression("reader", "AlignStruct"))),
-                                ReturnStatement(
-                                    dBusDotnetType.InnerTypes.Length == 1
-                                        ? ObjectCreationExpression(type)
-                                            .AddArgumentListArguments(
-                                                Argument(
-                                                    InvocationExpression(
-                                                        MakeMemberAccessExpression("reader", GetOrAddReadMethod(dBusDotnetType.InnerTypes[0])))))
-                                        : TupleExpression()
-                                            .AddArguments(
-                                                dBusDotnetType.InnerTypes.Select(innerDBusValue => Argument(
+                _readMethodExtensions.Add(identifier,
+                    MethodDeclaration(type, identifier)
+                        .AddModifiers(
+                            Token(SyntaxKind.PublicKeyword),
+                            Token(SyntaxKind.StaticKeyword))
+                        .AddParameterListParameters(
+                            Parameter(
+                                    Identifier("reader"))
+                                .WithType(
+                                    IdentifierName("Reader"))
+                                .AddModifiers(
+                                    Token(SyntaxKind.ThisKeyword),
+                                    Token(SyntaxKind.RefKeyword)))
+                        .WithBody(
+                            Block()
+                                .AddStatements(
+                                    ExpressionStatement(
+                                        InvocationExpression(
+                                            MakeMemberAccessExpression("reader", "AlignStruct"))),
+                                    ReturnStatement(
+                                        dBusDotnetType.InnerTypes.Length == 1
+                                            ? ObjectCreationExpression(type)
+                                                .AddArgumentListArguments(
+                                                    Argument(
                                                         InvocationExpression(
-                                                            MakeMemberAccessExpression("reader", GetOrAddReadMethod(innerDBusValue)))))
-                                                    .ToArray())))));
+                                                            MakeMemberAccessExpression("reader", GetOrAddReadMethod(dBusDotnetType.InnerTypes[0])))))
+                                            : TupleExpression()
+                                                .AddArguments(
+                                                    dBusDotnetType.InnerTypes.Select(innerDBusValue => Argument(
+                                                            InvocationExpression(
+                                                                MakeMemberAccessExpression("reader", GetOrAddReadMethod(innerDBusValue)))))
+                                                        .ToArray())))));
 
-            return identifier;
+                return identifier;
+            }
         }
 
         private string GetOrAddReadMessageMethod(DBusValue dBusValue, bool isVariant = false) => GetOrAddReadMessageMethod([dBusValue], isVariant);
@@ -334,31 +343,33 @@ namespace Tmds.DBus.SourceGenerator
         private string GetOrAddReadMessageMethod(IReadOnlyList<DBusValue> dBusValues, bool isVariant = false)
         {
             string identifier = $"ReadMessage_{(isVariant ? "v_" : null)}{SanitizeSignature(ParseSignature(dBusValues))}";
-            if (_readMethodExtensions.ContainsKey(identifier))
-                return identifier;
-
-            BlockSyntax block = Block()
-                .AddStatements(
-                    LocalDeclarationStatement(
-                        VariableDeclaration(
-                                IdentifierName("Reader"))
-                            .AddVariables(
-                                VariableDeclarator("reader")
-                                    .WithInitializer(
-                                        EqualsValueClause(
-                                            InvocationExpression(
-                                                MakeMemberAccessExpression("message", "GetBodyReader")))))));
-
-            if (isVariant)
+            lock (_readMethodExtensionsLock)
             {
-                block = block.AddStatements(
-                    ExpressionStatement(
-                        InvocationExpression(
-                                MakeMemberAccessExpression("reader", "ReadSignature"))
-                            .AddArgumentListArguments(
-                                Argument(
-                                    MakeLiteralExpression(dBusValues[0].Type!)))));
-            }
+                if (_readMethodExtensions.ContainsKey(identifier))
+                    return identifier;
+
+                BlockSyntax block = Block()
+                    .AddStatements(
+                        LocalDeclarationStatement(
+                            VariableDeclaration(
+                                    IdentifierName("Reader"))
+                                .AddVariables(
+                                    VariableDeclarator("reader")
+                                        .WithInitializer(
+                                            EqualsValueClause(
+                                                InvocationExpression(
+                                                    MakeMemberAccessExpression("message", "GetBodyReader")))))));
+
+                if (isVariant)
+                {
+                    block = block.AddStatements(
+                        ExpressionStatement(
+                            InvocationExpression(
+                                    MakeMemberAccessExpression("reader", "ReadSignature"))
+                                .AddArgumentListArguments(
+                                    Argument(
+                                        MakeLiteralExpression(dBusValues[0].Type!)))));
+                }
 
             if (dBusValues.Count == 1)
             {
@@ -383,14 +394,14 @@ namespace Tmds.DBus.SourceGenerator
                                                     MakeMemberAccessExpression("reader", GetOrAddReadMethod(dBusValues[i].DBusDotnetType))))))));
                 }
 
-                block = block.AddStatements(
-                    ReturnStatement(
-                        TupleExpression(
-                            SeparatedList(
-                                dBusValues.Select(static (_, i) =>
-                                    Argument(
-                                        IdentifierName($"arg{i}")))))));
-            }
+                    block = block.AddStatements(
+                        ReturnStatement(
+                            TupleExpression(
+                                SeparatedList(
+                                    dBusValues.Select(static (_, i) =>
+                                        Argument(
+                                            IdentifierName($"arg{i}")))))));
+                }
 
             _readMethodExtensions.Add(identifier,
                 MethodDeclaration(
@@ -411,14 +422,17 @@ namespace Tmds.DBus.SourceGenerator
                                         Token(SyntaxKind.ObjectKeyword)))))
                     .WithBody(block));
 
-            return identifier;
+                return identifier;
+            }
         }
 
         private string GetOrAddWriteVariantMethod(DBusValue dBusValue)
         {
             string identifier = $"WriteVariant_{SanitizeSignature(dBusValue.Type!)}";
-            if (_writeMethodExtensions.ContainsKey(identifier))
-                return identifier;
+            lock (_writeMethodExtensionsLock)
+            {
+                if (_writeMethodExtensions.ContainsKey(identifier))
+                    return identifier;
 
             _writeMethodExtensions.Add(identifier,
                 MethodDeclaration(
@@ -457,14 +471,17 @@ namespace Tmds.DBus.SourceGenerator
                                                     Argument(
                                                         IdentifierName("value")))))))));
 
-            return identifier;
+                return identifier;
+            }
         }
 
         private string GetOrAddWriteArrayMethod(DBusDotnetType dBusDotnetType)
         {
             string identifier = $"WriteArray_{SanitizeSignature(dBusDotnetType.DBusTypeSignature)}";
-            if (_writeMethodExtensions.ContainsKey(identifier))
-                return identifier;
+            lock (_writeMethodExtensionsLock)
+            {
+                if (_writeMethodExtensions.ContainsKey(identifier))
+                    return identifier;
 
             _writeMethodExtensions.Add(identifier,
                 MethodDeclaration(
@@ -519,14 +536,17 @@ namespace Tmds.DBus.SourceGenerator
                                         .AddArgumentListArguments(
                                             Argument(IdentifierName("arrayStart")))))));
 
-            return identifier;
+                return identifier;
+            }
         }
 
         private string GetOrAddWriteDictionaryMethod(DBusDotnetType dBusDotnetType)
         {
             string identifier = $"WriteDictionary_{SanitizeSignature(dBusDotnetType.DBusTypeSignature)}";
-            if (_writeMethodExtensions.ContainsKey(identifier))
-                return identifier;
+            lock (_writeMethodExtensionsLock)
+            {
+                if (_writeMethodExtensions.ContainsKey(identifier))
+                    return identifier;
 
             _writeMethodExtensions.Add(identifier,
                 MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), identifier)
@@ -594,14 +614,17 @@ namespace Tmds.DBus.SourceGenerator
                                             Argument(
                                                 IdentifierName("arrayStart")))))));
 
-            return identifier;
+                return identifier;
+            }
         }
 
         private string GetOrAddWriteStructMethod(DBusDotnetType dBusDotnetType)
         {
             string identifier = $"WriteStruct_{SanitizeSignature(dBusDotnetType.DBusTypeSignature)}";
-            if (_writeMethodExtensions.ContainsKey(identifier))
-                return identifier;
+            lock (_writeMethodExtensionsLock)
+            {
+                if (_writeMethodExtensions.ContainsKey(identifier))
+                    return identifier;
 
             _writeMethodExtensions.Add(identifier,
                 MethodDeclaration(
@@ -637,7 +660,8 @@ namespace Tmds.DBus.SourceGenerator
                                     .Cast<StatementSyntax>()
                                     .ToArray())));
 
-            return identifier;
+                return identifier;
+            }
         }
     }
 }
