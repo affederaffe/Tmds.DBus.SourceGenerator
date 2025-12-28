@@ -106,20 +106,21 @@ public partial class DBusSourceGenerator
                                             #nullable enable
                                             namespace Tmds.DBus.SourceGenerator
                                             {
-                                                internal class PathHandler : IMethodHandler
+                                                internal class PathHandler : IPathMethodHandler
                                                 {
-                                                    private readonly bool _runMethodHandlerSynchronously;
                                                     private readonly ICollection<IDBusInterfaceHandler> _dbusInterfaces;
 
-                                                    public PathHandler(string path, bool runMethodHandlerSynchronously = true)
+                                                    public PathHandler(string path)
                                                     {
                                                         Path = path;
-                                                        _runMethodHandlerSynchronously = runMethodHandlerSynchronously;
                                                         _dbusInterfaces = new List<IDBusInterfaceHandler>();
                                                     }
 
                                                     /// <inheritdoc />
                                                     public string Path { get; }
+
+                                                    /// <inheritdoc />
+                                                    public bool HandlesChildPaths => false;
 
                                                     /// <inheritdoc />
                                                     public async ValueTask HandleMethodAsync(MethodContext context)
@@ -194,9 +195,6 @@ public partial class DBusSourceGenerator
                                                                break;
                                                         }
                                                     }
-
-                                                    /// <inheritdoc />
-                                                    public bool RunMethodHandlerSynchronously(Message message) => _runMethodHandlerSynchronously;
 
                                                     /// <inheritdoc />
                                                     public void Add(IDBusInterfaceHandler item)
