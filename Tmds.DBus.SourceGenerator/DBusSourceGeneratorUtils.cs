@@ -90,6 +90,8 @@ internal static class DBusSourceGeneratorUtils
             PredefinedType(
                 Token(syntaxKind))));
 
+    internal static ArgumentListSyntax MakeSingletonArgumentList<T>(T argument) where T : ExpressionSyntax =>  ArgumentList(SingletonSeparatedList(Argument(argument)));
+
     private static SyntaxToken Utf8Literal(string value) =>
         Token(
             TriviaList(ElasticMarker),
