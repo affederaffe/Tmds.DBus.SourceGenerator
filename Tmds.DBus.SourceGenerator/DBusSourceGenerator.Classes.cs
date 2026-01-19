@@ -1,5 +1,7 @@
+using System;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Tmds.DBus.Protocol;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 
@@ -75,20 +77,20 @@ public partial class DBusSourceGenerator
                                                              internal interface IDBusInterfaceHandler
                                                              {
                                                                  PathHandler? PathHandler { get; set; }
-                                                             
+
                                                                  Connection Connection { get; }
 
-                                                                 string InterfaceName { get; }
+                                                                 ReadOnlySpan<byte> InterfaceName { get; }
 
                                                                  ReadOnlyMemory<byte> IntrospectXml { get; }
 
-                                                                 void ReplyGetProperty(string name, MethodContext context);
+                                                                 void ReplyGetProperty(ReadOnlySpan<byte> name, MethodContext context);
 
                                                                  void ReplyGetAllProperties(MethodContext context);
                                                                  
-                                                                 void SetProperty(string name, ref Reader reader);
+                                                                 void SetProperty(ReadOnlySpan<byte> name, ref Reader reader);
                                                                  
-                                                                 ValueTask ReplyInterfaceRequest(MethodContext context);
+                                                                 ValueTask ReplyInterfaceRequestAsync(MethodContext context);
                                                              }
                                                          }
 
@@ -108,7 +110,7 @@ public partial class DBusSourceGenerator
                                             {
                                                 internal class PathHandler : IPathMethodHandler
                                                 {
-                                                    private readonly ICollection<IDBusInterfaceHandler> _dbusInterfaces;
+                                                    private readonly List<IDBusInterfaceHandler> _dbusInterfaces;
 
                                                     public PathHandler(string path)
                                                     {
@@ -125,74 +127,94 @@ public partial class DBusSourceGenerator
                                                     /// <inheritdoc />
                                                     public async ValueTask HandleMethodAsync(MethodContext context)
                                                     {
-                                                        switch (context.Request.InterfaceAsString)
+                                                        if (context.Request.Interface.SequenceEqual("org.freedesktop.DBus.Properties"u8))
                                                         {
-                                                            case "org.freedesktop.DBus.Properties":
-                                                                switch (context.Request.MemberAsString, context.Request.SignatureAsString)
+                                                            if (context.Request.Member.SequenceEqual("Get"u8) && context.Request.Signature.SequenceEqual("ss"u8))
+                                                            {
+                                                                Reply();
+                                                                void Reply()
                                                                 {
-                                                                    case ("Get", "ss"):
+                                                                    Reader reader = context.Request.GetBodyReader();
+                                                                    ReadOnlySpan<byte> @interface = reader.ReadStringAsSpan();
+                                                                    IDBusInterfaceHandler? handler = null;
+                                                                    foreach (IDBusInterfaceHandler interfaceHandler in _dbusInterfaces)
                                                                     {
-                                                                        Reply();
-                                                                        void Reply()
+                                                                        if (interfaceHandler.InterfaceName.SequenceEqual(@interface))
                                                                         {
-                                                                            Reader reader = context.Request.GetBodyReader();
-                                                                            string @interface = reader.ReadString();
-                                                                            IDBusInterfaceHandler? handler = _dbusInterfaces.FirstOrDefault(x => x.InterfaceName == @interface);
-                                                                            if (handler is null)
-                                                                                return;
-                                                                            string member = reader.ReadString();
-                                                                            handler.ReplyGetProperty(member, context);
+                                                                            handler = interfaceHandler;
+                                                                            break;
                                                                         }
-
-                                                                        break;
                                                                     }
-                                                                    case ("GetAll", "s"):
-                                                                    {
-                                                                        Reply();
-                                                                        void Reply()
-                                                                        {
-                                                                            Reader reader = context.Request.GetBodyReader();
-                                                                            string @interface = reader.ReadString();
-                                                                            IDBusInterfaceHandler? handler = _dbusInterfaces.FirstOrDefault(x => x.InterfaceName == @interface);
-                                                                            if (handler is null)
-                                                                                return;
-                                                                            handler.ReplyGetAllProperties(context);
-                                                                        }
+                                                                    
+                                                                    if (handler is null)
+                                                                        return;
 
-                                                                        break;
-                                                                    }
-                                                                    case ("Set", "ssv"):
+                                                                    ReadOnlySpan<byte> member = reader.ReadStringAsSpan();
+                                                                    handler.ReplyGetProperty(member, context);
+                                                                }
+                                                            }
+                                                            else if (context.Request.Member.SequenceEqual("GetAll"u8) && context.Request.Signature.SequenceEqual("s"u8))
+                                                            {
+                                                                Reply();
+                                                                void Reply()
+                                                                {
+                                                                    Reader reader = context.Request.GetBodyReader();
+                                                                    ReadOnlySpan<byte> @interface = reader.ReadStringAsSpan();
+                                                                    IDBusInterfaceHandler? handler = null;
+                                                                    foreach (IDBusInterfaceHandler interfaceHandler in _dbusInterfaces)
                                                                     {
-                                                                        Reply();
-                                                                        void Reply()
+                                                                        if (interfaceHandler.InterfaceName.SequenceEqual(@interface))
                                                                         {
-                                                                            Reader reader = context.Request.GetBodyReader();
-                                                                            string @interface = reader.ReadString();
-                                                                            IDBusInterfaceHandler? handler = _dbusInterfaces.FirstOrDefault(x => x.InterfaceName == @interface);
-                                                                            if (handler is null)
-                                                                                return;
-                                                                            string member = reader.ReadString();
-                                                                            handler.SetProperty(member, ref reader);
-                                                                            if (!context.NoReplyExpected)
-                                                                            {
-                                                                                using MessageWriter writer = context.CreateReplyWriter(null);
-                                                                                context.Reply(writer.CreateMessage());
-                                                                            }
+                                                                            handler = interfaceHandler;
+                                                                            break;
                                                                         }
-                                                                        
-                                                                        break;
+                                                                    }
+                                                                    
+                                                                    if (handler is null)
+                                                                        return;
+
+                                                                    handler.ReplyGetAllProperties(context);
+                                                                }
+                                                            }
+                                                            else if (context.Request.Member.SequenceEqual("Set"u8) && context.Request.Signature.SequenceEqual("ssv"u8))
+                                                            {
+                                                                Reply();
+                                                                void Reply()
+                                                                {
+                                                                    Reader reader = context.Request.GetBodyReader();
+                                                                    ReadOnlySpan<byte> @interface = reader.ReadStringAsSpan();
+                                                                    IDBusInterfaceHandler? handler = null;
+                                                                    foreach (IDBusInterfaceHandler interfaceHandler in _dbusInterfaces)
+                                                                    {
+                                                                        if (interfaceHandler.InterfaceName.SequenceEqual(@interface))
+                                                                        {
+                                                                            handler = interfaceHandler;
+                                                                            break;
+                                                                        }
+                                                                    }
+                                                                    
+                                                                    if (handler is null)
+                                                                        return;
+
+                                                                    ReadOnlySpan<byte> member = reader.ReadStringAsSpan();
+                                                                    handler.SetProperty(member, ref reader);
+                                                                    if (!context.NoReplyExpected)
+                                                                    {
+                                                                        using MessageWriter writer = context.CreateReplyWriter(null);
+                                                                        context.Reply(writer.CreateMessage());
                                                                     }
                                                                 }
-
-                                                                break;
-                                                            case "org.freedesktop.DBus.Introspectable":
-                                                                context.ReplyIntrospectXml(_dbusInterfaces.Select(static x => x.IntrospectXml).ToArray());
-                                                                break;
-                                                            default:
-                                                               IDBusInterfaceHandler? handler = _dbusInterfaces.FirstOrDefault(x => x.InterfaceName == context.Request.InterfaceAsString);
-                                                                   if (handler is not null)
-                                                                       await handler.ReplyInterfaceRequest(context);
-                                                               break;
+                                                            }
+                                                        }
+                                                        else if (context.Request.Interface.SequenceEqual("org.freedesktop.DBus.Introspectable"u8))
+                                                        {
+                                                            context.ReplyIntrospectXml(_dbusInterfaces.Select(static x => x.IntrospectXml).ToArray());
+                                                        }
+                                                        else
+                                                        {
+                                                            IDBusInterfaceHandler? handler = _dbusInterfaces.FirstOrDefault(x => x.InterfaceName.SequenceEqual(context.Request.Interface));
+                                                            if (handler is not null)
+                                                                await handler.ReplyInterfaceRequestAsync(context);
                                                         }
                                                     }
 
@@ -230,7 +252,7 @@ public partial class DBusSourceGenerator
                 Parameter(
                         Identifier("writer"))
                     .WithType(
-                        IdentifierName("MessageWriter"))
+                        IdentifierName(nameof(MessageWriter)))
                     .AddModifiers(
                         Token(SyntaxKind.ThisKeyword),
                         Token(SyntaxKind.RefKeyword)),
@@ -242,41 +264,13 @@ public partial class DBusSourceGenerator
             .WithExpressionBody(
                 ArrowExpressionClause(
                     InvocationExpression(
-                            MakeMemberAccessExpression("writer", "WriteString"))
+                            MakeMemberAccessExpression("writer", nameof(MessageWriter.WriteString)))
                         .AddArgumentListArguments(
                             Argument(
                                 BinaryExpression(
                                     SyntaxKind.CoalesceExpression,
                                     IdentifierName("value"),
-                                    MakeMemberAccessExpression("string", "Empty"))))))
-            .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
-
-    private static MethodDeclarationSyntax MakeWriteObjectPathSafeMethod() =>
-        MethodDeclaration(
-                PredefinedType(Token(SyntaxKind.VoidKeyword)),
-                "WriteObjectPathSafe")
-            .AddModifiers(
-                Token(SyntaxKind.PublicKeyword),
-                Token(SyntaxKind.StaticKeyword))
-            .AddParameterListParameters(
-                Parameter(
-                        Identifier("writer"))
-                    .WithType(
-                        IdentifierName("MessageWriter"))
-                    .AddModifiers(
-                        Token(SyntaxKind.ThisKeyword),
-                        Token(SyntaxKind.RefKeyword)),
-                Parameter(
-                        Identifier("value"))
-                    .WithType(
-                        IdentifierName("ObjectPath")))
-            .WithExpressionBody(
-                ArrowExpressionClause(
-                    InvocationExpression(
-                            MakeMemberAccessExpression("writer", "WriteObjectPath"))
-                        .AddArgumentListArguments(
-                            Argument(
-                                InvocationExpression(
-                                    MakeMemberAccessExpression("value", "ToString"))))))
-            .WithSemicolonToken(Token(SyntaxKind.SemicolonToken));
+                                    MakeMemberAccessExpression(nameof(String), nameof(string.Empty)))))))
+            .WithSemicolonToken(
+                Token(SyntaxKind.SemicolonToken));
 }

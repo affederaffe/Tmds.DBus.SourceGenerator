@@ -4,6 +4,8 @@ using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.Win32.SafeHandles;
+using Tmds.DBus.Protocol;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 
@@ -42,18 +44,6 @@ public partial class DBusSourceGenerator
                             NullableDirectiveTrivia(
                                 Token(SyntaxKind.EnableKeyword), true)))))
             .NormalizeWhitespace();
-
-    private static FieldDeclarationSyntax MakePrivateStringConst(string identifier, string value, TypeSyntax type) =>
-        FieldDeclaration(
-                VariableDeclaration(type)
-                    .AddVariables(
-                        VariableDeclarator(identifier)
-                            .WithInitializer(
-                                EqualsValueClause(
-                                    MakeLiteralExpression(value)))))
-            .AddModifiers(
-                Token(SyntaxKind.PrivateKeyword),
-                Token(SyntaxKind.ConstKeyword));
 
     private static FieldDeclarationSyntax MakePrivateReadOnlyField(string identifier, TypeSyntax type) =>
         FieldDeclaration(
@@ -98,6 +88,13 @@ public partial class DBusSourceGenerator
 
     private static LiteralExpressionSyntax MakeLiteralExpression(string literal) => LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(literal));
 
+    private static LiteralExpressionSyntax MakeUtf8StringLiteralExpression(string literal) => LiteralExpression(SyntaxKind.StringLiteralExpression, Utf8Literal(literal));
+
+    private static TypeArgumentListSyntax MakeSingletonTypeArgumentList(SyntaxKind syntaxKind) => TypeArgumentList(
+        SingletonSeparatedList<TypeSyntax>(
+            PredefinedType(
+                Token(syntaxKind))));
+
     private static SyntaxToken Utf8Literal(string value) =>
         Token(
             TriviaList(ElasticMarker),
@@ -110,20 +107,20 @@ public partial class DBusSourceGenerator
     {
         return dBusDotnetType.DotnetType switch
         {
-            DotnetType.Byte => "WriteByte",
-            DotnetType.Bool => "WriteBool",
-            DotnetType.Int16 => "WriteInt16",
-            DotnetType.UInt16 => "WriteUInt16",
-            DotnetType.Int32 => "WriteInt32",
-            DotnetType.UInt32 => "WriteUInt32",
-            DotnetType.Int64 => "WriteInt64",
-            DotnetType.UInt64 => "WriteUInt64",
-            DotnetType.Double => "WriteDouble",
+            DotnetType.Byte => nameof(MessageWriter.WriteByte),
+            DotnetType.Bool => nameof(MessageWriter.WriteBool),
+            DotnetType.Int16 => nameof(MessageWriter.WriteInt16),
+            DotnetType.UInt16 => nameof(MessageWriter.WriteUInt16),
+            DotnetType.Int32 => nameof(MessageWriter.WriteInt32),
+            DotnetType.UInt32 => nameof(MessageWriter.WriteUInt32),
+            DotnetType.Int64 => nameof(MessageWriter.WriteInt64),
+            DotnetType.UInt64 => nameof(MessageWriter.WriteUInt64),
+            DotnetType.Double => nameof(MessageWriter.WriteDouble),
             DotnetType.String => "WriteNullableString",
-            DotnetType.ObjectPath => "WriteObjectPathSafe",
-            DotnetType.Signature => "WriteSignature",
-            DotnetType.SafeFileHandle => "WriteHandle",
-            DotnetType.Variant => "WriteVariant",
+            DotnetType.ObjectPath => nameof(MessageWriter.WriteObjectPath),
+            DotnetType.Signature => nameof(MessageWriter.WriteSignature),
+            DotnetType.SafeFileHandle => nameof(MessageWriter.WriteHandle),
+            DotnetType.Variant => nameof(MessageWriter.WriteVariant),
             DotnetType.Array => GetOrAddWriteArrayMethod(dBusDotnetType),
             DotnetType.Dictionary => GetOrAddWriteDictionaryMethod(dBusDotnetType),
             DotnetType.Tuple => GetOrAddWriteStructMethod(dBusDotnetType),
@@ -135,20 +132,20 @@ public partial class DBusSourceGenerator
     {
         return dBusDotnetType.DotnetType switch
         {
-            DotnetType.Byte => "ReadByte",
-            DotnetType.Bool => "ReadBool",
-            DotnetType.Int16 => "ReadInt16",
-            DotnetType.UInt16 => "ReadUInt16",
-            DotnetType.Int32 => "ReadInt32",
-            DotnetType.UInt32 => "ReadUInt32",
-            DotnetType.Int64 => "ReadInt64",
-            DotnetType.UInt64 => "ReadUInt64",
-            DotnetType.Double => "ReadDouble",
-            DotnetType.String => "ReadString",
-            DotnetType.ObjectPath => "ReadObjectPath",
-            DotnetType.Signature => "ReadSignature",
-            DotnetType.SafeFileHandle => "ReadHandle<SafeFileHandle>",
-            DotnetType.Variant => "ReadVariantValue",
+            DotnetType.Byte => nameof(Reader.ReadByte),
+            DotnetType.Bool => nameof(Reader.ReadBool),
+            DotnetType.Int16 => nameof(Reader.ReadInt16),
+            DotnetType.UInt16 => nameof(Reader.ReadUInt16),
+            DotnetType.Int32 => nameof(Reader.ReadInt32),
+            DotnetType.UInt32 => nameof(Reader.ReadUInt32),
+            DotnetType.Int64 => nameof(Reader.ReadInt64),
+            DotnetType.UInt64 => nameof(Reader.ReadUInt64),
+            DotnetType.Double => nameof(Reader.ReadDouble),
+            DotnetType.String => nameof(Reader.ReadString),
+            DotnetType.ObjectPath => nameof(Reader.ReadObjectPath),
+            DotnetType.Signature => nameof(Reader.ReadSignature),
+            DotnetType.SafeFileHandle => $"{nameof(Reader.ReadHandle)}<{nameof(SafeFileHandle)}>",
+            DotnetType.Variant => nameof(Reader.ReadVariantValue),
             DotnetType.Array => GetOrAddReadArrayMethod(dBusDotnetType),
             DotnetType.Dictionary => GetOrAddReadDictionaryMethod(dBusDotnetType),
             DotnetType.Tuple => GetOrAddReadStructMethod(dBusDotnetType),
@@ -173,7 +170,7 @@ public partial class DBusSourceGenerator
                         Parameter(
                                 Identifier("reader"))
                             .WithType(
-                                IdentifierName("Reader"))
+                                IdentifierName(nameof(Reader)))
                             .AddModifiers(
                                 Token(SyntaxKind.ThisKeyword),
                                 Token(SyntaxKind.RefKeyword)))
@@ -182,7 +179,7 @@ public partial class DBusSourceGenerator
                             .AddStatements(
                                 LocalDeclarationStatement(
                                     VariableDeclaration(
-                                            GenericName("List")
+                                            GenericName(nameof(System.Collections.Generic.List<>))
                                                 .AddTypeArgumentListArguments(
                                                     dBusDotnetType.InnerTypes[0].ToTypeSyntax()))
                                         .AddVariables(
@@ -192,25 +189,26 @@ public partial class DBusSourceGenerator
                                                         ImplicitObjectCreationExpression())))),
                                 LocalDeclarationStatement(
                                     VariableDeclaration(
-                                            IdentifierName("ArrayEnd"))
+                                            IdentifierName(nameof(ArrayEnd)))
                                         .AddVariables(
                                             VariableDeclarator("headersEnd")
                                                 .WithInitializer(
                                                     EqualsValueClause(
                                                         InvocationExpression(
-                                                                MakeMemberAccessExpression("reader", "ReadArrayStart"))
+                                                                MakeMemberAccessExpression("reader", nameof(Reader.ReadArrayStart)))
                                                             .AddArgumentListArguments(
                                                                 Argument(
-                                                                    MakeMemberAccessExpression("DBusType",
+                                                                    MakeMemberAccessExpression(nameof(DBusType),
                                                                         dBusDotnetType.InnerTypes[0].DBusType.ToString()))))))),
                                 WhileStatement(
                                     InvocationExpression(
-                                            MakeMemberAccessExpression("reader", "HasNext"))
+                                            MakeMemberAccessExpression("reader", nameof(Reader.HasNext)))
                                         .AddArgumentListArguments(
-                                            Argument(IdentifierName("headersEnd"))),
+                                            Argument(
+                                                IdentifierName("headersEnd"))),
                                     ExpressionStatement(
                                         InvocationExpression(
-                                                MakeMemberAccessExpression("items", "Add"))
+                                                MakeMemberAccessExpression("items", nameof(System.Collections.Generic.List<>.Add)))
                                             .AddArgumentListArguments(
                                                 Argument(
                                                     InvocationExpression(
@@ -218,7 +216,7 @@ public partial class DBusSourceGenerator
                                                             GetOrAddReadMethod(dBusDotnetType.InnerTypes[0]))))))),
                                 ReturnStatement(
                                     InvocationExpression(
-                                        MakeMemberAccessExpression("items", "ToArray")))
+                                        MakeMemberAccessExpression("items", nameof(System.Collections.Generic.List<>.ToArray))))
                             )));
 
             return identifier;
@@ -244,7 +242,7 @@ public partial class DBusSourceGenerator
                         Parameter(
                                 Identifier("reader"))
                             .WithType(
-                                IdentifierName("Reader"))
+                                IdentifierName(nameof(Reader)))
                             .AddModifiers(
                                 Token(SyntaxKind.ThisKeyword),
                                 Token(SyntaxKind.RefKeyword)))
@@ -260,25 +258,25 @@ public partial class DBusSourceGenerator
                                                         ImplicitObjectCreationExpression())))),
                                 LocalDeclarationStatement(
                                     VariableDeclaration(
-                                            IdentifierName("ArrayEnd"))
+                                            IdentifierName(nameof(ArrayEnd)))
                                         .AddVariables(
                                             VariableDeclarator("headersEnd")
                                                 .WithInitializer(
                                                     EqualsValueClause(
                                                         InvocationExpression(
-                                                                MakeMemberAccessExpression("reader", "ReadArrayStart"))
+                                                                MakeMemberAccessExpression("reader", nameof(Reader.ReadArrayStart)))
                                                             .AddArgumentListArguments(
                                                                 Argument(
-                                                                    MakeMemberAccessExpression("DBusType", "Struct"))))))),
+                                                                    MakeMemberAccessExpression(nameof(DBusType), nameof(DBusType.Struct)))))))),
                                 WhileStatement(
                                     InvocationExpression(
-                                            MakeMemberAccessExpression("reader", "HasNext"))
+                                            MakeMemberAccessExpression("reader", nameof(Reader.HasNext)))
                                         .AddArgumentListArguments(
                                             Argument(
                                                 IdentifierName("headersEnd"))),
                                     ExpressionStatement(
                                         InvocationExpression(
-                                                MakeMemberAccessExpression("items", "Add"))
+                                                MakeMemberAccessExpression("items", nameof(System.Collections.Generic.List<>.Add)))
                                             .AddArgumentListArguments(
                                                 Argument(
                                                     InvocationExpression(
@@ -313,7 +311,7 @@ public partial class DBusSourceGenerator
                         Parameter(
                                 Identifier("reader"))
                             .WithType(
-                                IdentifierName("Reader"))
+                                IdentifierName(nameof(Reader)))
                             .AddModifiers(
                                 Token(SyntaxKind.ThisKeyword),
                                 Token(SyntaxKind.RefKeyword)))
@@ -322,7 +320,7 @@ public partial class DBusSourceGenerator
                             .AddStatements(
                                 ExpressionStatement(
                                     InvocationExpression(
-                                        MakeMemberAccessExpression("reader", "AlignStruct"))),
+                                        MakeMemberAccessExpression("reader", nameof(Reader.AlignStruct)))),
                                 ReturnStatement(
                                     dBusDotnetType.InnerTypes.Length == 1
                                         ? ObjectCreationExpression(type)
@@ -355,20 +353,20 @@ public partial class DBusSourceGenerator
                 .AddStatements(
                     LocalDeclarationStatement(
                         VariableDeclaration(
-                                IdentifierName("Reader"))
+                                IdentifierName(nameof(Reader)))
                             .AddVariables(
                                 VariableDeclarator("reader")
                                     .WithInitializer(
                                         EqualsValueClause(
                                             InvocationExpression(
-                                                MakeMemberAccessExpression("message", "GetBodyReader")))))));
+                                                MakeMemberAccessExpression("message", nameof(Message.GetBodyReader))))))));
 
             if (isVariant)
             {
                 block = block.AddStatements(
                     ExpressionStatement(
                         InvocationExpression(
-                                MakeMemberAccessExpression("reader", "ReadSignature"))
+                                MakeMemberAccessExpression("reader", nameof(Reader.ReadSignature)))
                             .AddArgumentListArguments(
                                 Argument(
                                     MakeLiteralExpression(dBusValues[0].Type!)))));
@@ -417,7 +415,7 @@ public partial class DBusSourceGenerator
                         Parameter(
                                 Identifier("message"))
                             .WithType(
-                                IdentifierName("Message")),
+                                IdentifierName(nameof(Message))),
                         Parameter(
                                 Identifier("_"))
                             .WithType(
@@ -448,7 +446,7 @@ public partial class DBusSourceGenerator
                         Parameter(
                                 Identifier("writer"))
                             .WithType(
-                                IdentifierName("MessageWriter"))
+                                IdentifierName(nameof(MessageWriter)))
                             .AddModifiers(
                                 Token(SyntaxKind.ThisKeyword),
                                 Token(SyntaxKind.RefKeyword)),
@@ -461,7 +459,7 @@ public partial class DBusSourceGenerator
                                 SingletonList(
                                     ExpressionStatement(
                                         InvocationExpression(
-                                                MakeMemberAccessExpression("writer", "WriteSignature"))
+                                                MakeMemberAccessExpression("writer", nameof(MessageWriter.WriteSignature)))
                                             .AddArgumentListArguments(
                                                 Argument(
                                                     MakeLiteralExpression(dBusValue.Type!))))))
@@ -498,7 +496,7 @@ public partial class DBusSourceGenerator
                         Parameter(
                                 Identifier("writer"))
                             .WithType(
-                                IdentifierName("MessageWriter"))
+                                IdentifierName(nameof(MessageWriter)))
                             .AddModifiers(
                                 Token(SyntaxKind.ThisKeyword),
                                 Token(SyntaxKind.RefKeyword)),
@@ -509,16 +507,17 @@ public partial class DBusSourceGenerator
                         Block()
                             .AddStatements(
                                 LocalDeclarationStatement(
-                                    VariableDeclaration(IdentifierName("ArrayStart"))
+                                    VariableDeclaration(
+                                            IdentifierName(nameof(ArrayStart)))
                                         .AddVariables(
                                             VariableDeclarator("arrayStart")
                                                 .WithInitializer(
                                                     EqualsValueClause(
                                                         InvocationExpression(
-                                                                MakeMemberAccessExpression("writer", "WriteArrayStart"))
+                                                                MakeMemberAccessExpression("writer", nameof(MessageWriter.WriteArrayStart)))
                                                             .AddArgumentListArguments(
                                                                 Argument(
-                                                                    MakeMemberAccessExpression("DBusType",
+                                                                    MakeMemberAccessExpression(nameof(DBusType),
                                                                         dBusDotnetType.InnerTypes[0].DBusType.ToString()))))))),
                                 IfStatement(
                                     IsPatternExpression(
@@ -534,12 +533,14 @@ public partial class DBusSourceGenerator
                                             InvocationExpression(
                                                     MakeMemberAccessExpression("writer", GetOrAddWriteMethod(dBusDotnetType.InnerTypes[0])))
                                                 .AddArgumentListArguments(
-                                                    Argument(IdentifierName("value")))))),
+                                                    Argument(
+                                                        IdentifierName("value")))))),
                                 ExpressionStatement(
                                     InvocationExpression(
-                                            MakeMemberAccessExpression("writer", "WriteArrayEnd"))
+                                            MakeMemberAccessExpression("writer", nameof(MessageWriter.WriteArrayEnd)))
                                         .AddArgumentListArguments(
-                                            Argument(IdentifierName("arrayStart")))))));
+                                            Argument(
+                                                IdentifierName("arrayStart")))))));
 
             return identifier;
         }
@@ -562,7 +563,7 @@ public partial class DBusSourceGenerator
                         Parameter(
                                 Identifier("writer"))
                             .WithType(
-                                IdentifierName("MessageWriter"))
+                                IdentifierName(nameof(MessageWriter)))
                             .AddModifiers(
                                 Token(SyntaxKind.ThisKeyword),
                                 Token(SyntaxKind.RefKeyword)),
@@ -573,16 +574,17 @@ public partial class DBusSourceGenerator
                         Block()
                             .AddStatements(
                                 LocalDeclarationStatement(
-                                    VariableDeclaration(IdentifierName("ArrayStart"))
+                                    VariableDeclaration(
+                                            IdentifierName(nameof(ArrayStart)))
                                         .AddVariables(
                                             VariableDeclarator("arrayStart")
                                                 .WithInitializer(
                                                     EqualsValueClause(
                                                         InvocationExpression(
-                                                                MakeMemberAccessExpression("writer", "WriteArrayStart"))
+                                                                MakeMemberAccessExpression("writer", nameof(MessageWriter.WriteArrayStart)))
                                                             .AddArgumentListArguments(
                                                                 Argument(
-                                                                    MakeMemberAccessExpression("DBusType", "Struct"))))))),
+                                                                    MakeMemberAccessExpression(nameof(DBusType), nameof(DBusType.Struct)))))))),
                                 IfStatement(
                                     IsPatternExpression(
                                         IdentifierName("values"),
@@ -590,7 +592,7 @@ public partial class DBusSourceGenerator
                                             ConstantPattern(
                                                 LiteralExpression(SyntaxKind.NullLiteralExpression)))),
                                     ForEachStatement(
-                                        GenericName("KeyValuePair")
+                                        GenericName(nameof(KeyValuePair<,>))
                                             .AddTypeArgumentListArguments(
                                                 dBusDotnetType.InnerTypes[0].ToTypeSyntax(true),
                                                 dBusDotnetType.InnerTypes[1].ToTypeSyntax(true)),
@@ -599,22 +601,22 @@ public partial class DBusSourceGenerator
                                         Block(
                                             ExpressionStatement(
                                                 InvocationExpression(
-                                                    MakeMemberAccessExpression("writer", "WriteStructureStart"))),
+                                                    MakeMemberAccessExpression("writer", nameof(MessageWriter.WriteStructureStart)))),
                                             ExpressionStatement(
                                                 InvocationExpression(
                                                         MakeMemberAccessExpression("writer", GetOrAddWriteMethod(dBusDotnetType.InnerTypes[0])))
                                                     .AddArgumentListArguments(
                                                         Argument(
-                                                            MakeMemberAccessExpression("value", "Key")))),
+                                                            MakeMemberAccessExpression("value", nameof(KeyValuePair<,>.Key))))),
                                             ExpressionStatement(
                                                 InvocationExpression(
                                                         MakeMemberAccessExpression("writer", GetOrAddWriteMethod(dBusDotnetType.InnerTypes[1])))
                                                     .AddArgumentListArguments(
                                                         Argument(
-                                                            MakeMemberAccessExpression("value", "Value"))))))),
+                                                            MakeMemberAccessExpression("value", nameof(KeyValuePair<,>.Value)))))))),
                                 ExpressionStatement(
                                     InvocationExpression(
-                                            MakeMemberAccessExpression("writer", "WriteArrayEnd"))
+                                            MakeMemberAccessExpression("writer", nameof(MessageWriter.WriteArrayEnd)))
                                         .AddArgumentListArguments(
                                             Argument(
                                                 IdentifierName("arrayStart")))))));
@@ -642,7 +644,7 @@ public partial class DBusSourceGenerator
                         Parameter(
                                 Identifier("writer"))
                             .WithType(
-                                IdentifierName("MessageWriter"))
+                                IdentifierName(nameof(MessageWriter)))
                             .AddModifiers(
                                 Token(SyntaxKind.ThisKeyword),
                                 Token(SyntaxKind.RefKeyword)),
@@ -653,7 +655,7 @@ public partial class DBusSourceGenerator
                         Block(
                                 ExpressionStatement(
                                     InvocationExpression(
-                                        MakeMemberAccessExpression("writer", "WriteStructureStart"))))
+                                        MakeMemberAccessExpression("writer", nameof(MessageWriter.WriteStructureStart)))))
                             .AddStatements(
                                 dBusDotnetType.InnerTypes.Select((x, i) => ExpressionStatement(
                                         InvocationExpression(

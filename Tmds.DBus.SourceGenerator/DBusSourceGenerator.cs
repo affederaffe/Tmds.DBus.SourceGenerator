@@ -42,7 +42,7 @@ public partial class DBusSourceGenerator : IIncrementalGenerator
             initializationContext.AddSource("Tmds.DBus.SourceGenerator.IDBusInterfaceHandler.cs", DBusInterfaceHandlerInterface);
         });
 
-        IncrementalValuesProvider<(DBusNode, string)> generatorProvider = context.AdditionalTextsProvider
+        IncrementalValuesProvider<(DBusNode Node, string GeneratorMode)> generatorProvider = context.AdditionalTextsProvider
             .Where(static x => x.Path.EndsWith(".xml", StringComparison.Ordinal))
             .Combine(context.AnalyzerConfigOptionsProvider)
             .Select((x, _) =>
@@ -96,7 +96,8 @@ public partial class DBusSourceGenerator : IIncrementalGenerator
                         IdentifierName("Tmds.DBus.SourceGenerator"))
                     .AddMembers(
                         ClassDeclaration("ReaderExtensions")
-                            .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.StaticKeyword))
+                            .AddModifiers(
+                                Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.StaticKeyword))
                             .WithMembers(
                                 List<MemberDeclarationSyntax>(_readMethodExtensions.Values))));
 
@@ -105,11 +106,11 @@ public partial class DBusSourceGenerator : IIncrementalGenerator
                         IdentifierName("Tmds.DBus.SourceGenerator"))
                     .AddMembers(
                         ClassDeclaration("WriterExtensions")
-                            .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.StaticKeyword))
+                            .AddModifiers(
+                                Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.StaticKeyword))
                             .WithMembers(
                                 List<MemberDeclarationSyntax>(_writeMethodExtensions.Values)
-                                    .Add(MakeWriteNullableStringMethod())
-                                    .Add(MakeWriteObjectPathSafeMethod()))));
+                                    .Add(MakeWriteNullableStringMethod()))));
 
             productionContext.AddSource("Tmds.DBus.SourceGenerator.ReaderExtensions.cs", readerExtensions.GetText(Encoding.UTF8));
             productionContext.AddSource("Tmds.DBus.SourceGenerator.WriterExtensions.cs", writerExtensions.GetText(Encoding.UTF8));

@@ -3,8 +3,11 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.Win32.SafeHandles;
+using Tmds.DBus.Protocol;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 
@@ -57,13 +60,6 @@ public partial class DBusSourceGenerator
         return sb.ToString();
     }
 
-    private static string Camelize(ReadOnlySpan<char> name)
-    {
-        StringBuilder sb = new(Pascalize(name));
-        sb[0] = char.ToLowerInvariant(sb[0]);
-        return sb.ToString();
-    }
-
     [return: NotNullIfNotNull(nameof(dbusValues))]
     private static string? ParseSignature(IReadOnlyList<DBusValue>? dbusValues)
     {
@@ -101,8 +97,8 @@ public partial class DBusSourceGenerator
     {
         return dbusValues?.Count switch
         {
-            0 or null => IdentifierName("Task"),
-            _ => GenericName("Task")
+            0 or null => IdentifierName(nameof(Task)),
+            _ => GenericName(nameof(Task))
                 .AddTypeArgumentListArguments(
                     ParseReturnType(dbusValues))
         };
@@ -112,8 +108,8 @@ public partial class DBusSourceGenerator
     {
         return dbusValues?.Count switch
         {
-            0 or null => IdentifierName("ValueTask"),
-            _ => GenericName("ValueTask")
+            0 or null => IdentifierName(nameof(ValueTask)),
+            _ => GenericName(nameof(ValueTask))
                 .AddTypeArgumentListArguments(
                     ParseReturnType(dbusValues))
         };
@@ -123,11 +119,11 @@ public partial class DBusSourceGenerator
     {
         return dbusValues?.Count switch
         {
-            0 or null => GenericName("TaskCompletionSource")
+            0 or null => GenericName(nameof(TaskCompletionSource<>))
                 .AddTypeArgumentListArguments(
                     PredefinedType(
                         Token(SyntaxKind.BoolKeyword))),
-            _ => GenericName("TaskCompletionSource")
+            _ => GenericName(nameof(TaskCompletionSource<>))
                 .AddTypeArgumentListArguments(
                     ParseReturnType(dbusValues))
         };
@@ -139,7 +135,7 @@ public partial class DBusSourceGenerator
                 Parameter(
                         Identifier(dbusValue.Name is not null
                             ? SanitizeIdentifier(
-                                Camelize(dbusValue.Name.AsSpan()))
+                                Pascalize(dbusValue.Name.AsSpan(), true))
                             : $"arg{i}"))
                     .WithType(
                         dbusValue.DBusDotnetType.ToTypeSyntax()))
@@ -283,13 +279,13 @@ public partial class DBusSourceGenerator
                         str = NullableType(str);
                     return str;
                 case DotnetType.ObjectPath:
-                    return IdentifierName("ObjectPath");
+                    return IdentifierName(nameof(ObjectPath));
                 case DotnetType.Signature:
-                    return IdentifierName("Signature");
+                    return IdentifierName(nameof(Signature));
                 case DotnetType.Variant:
-                    return IdentifierName("VariantValue");
+                    return IdentifierName(nameof(VariantValue));
                 case DotnetType.SafeFileHandle:
-                    return IdentifierName("SafeFileHandle");
+                    return IdentifierName(nameof(SafeFileHandle));
                 case DotnetType.Array:
                     TypeSyntax arr = ArrayType(
                             innerTypes![0].ToTypeSyntax(nullable))
@@ -301,7 +297,7 @@ public partial class DBusSourceGenerator
                         arr = NullableType(arr);
                     return arr;
                 case DotnetType.Dictionary:
-                    TypeSyntax dict = GenericName("Dictionary")
+                    TypeSyntax dict = GenericName(nameof(Dictionary<,>))
                         .AddTypeArgumentListArguments(
                             innerTypes![0].ToTypeSyntax(),
                             innerTypes[1].ToTypeSyntax(nullable));
@@ -309,7 +305,7 @@ public partial class DBusSourceGenerator
                         dict = NullableType(dict);
                     return dict;
                 case DotnetType.Tuple when innerTypes!.Length == 1:
-                    return GenericName("ValueTuple")
+                    return GenericName(nameof(ValueTuple))
                         .AddTypeArgumentListArguments(
                             innerTypes[0].ToTypeSyntax(nullable));
                 case DotnetType.Tuple:

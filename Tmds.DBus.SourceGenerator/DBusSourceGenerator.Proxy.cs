@@ -1,7 +1,9 @@
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Tmds.DBus.Protocol;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 
@@ -13,10 +15,10 @@ public partial class DBusSourceGenerator
     {
         string identifier = $"{Pascalize(dBusInterface.Name.AsSpan())}Proxy";
         ClassDeclarationSyntax cl = ClassDeclaration(identifier)
-            .AddModifiers(Token(SyntaxKind.InternalKeyword));
+            .AddModifiers(
+                Token(SyntaxKind.InternalKeyword));
 
-        FieldDeclarationSyntax interfaceConst = MakePrivateStringConst("Interface", dBusInterface.Name!, PredefinedType(Token(SyntaxKind.StringKeyword)));
-        FieldDeclarationSyntax connectionField = MakePrivateReadOnlyField("_connection", IdentifierName("Connection"));
+        FieldDeclarationSyntax connectionField = MakePrivateReadOnlyField("_connection", IdentifierName(nameof(Connection)));
         FieldDeclarationSyntax destinationField = MakePrivateReadOnlyField("_destination", PredefinedType(Token(SyntaxKind.StringKeyword)));
         FieldDeclarationSyntax pathField = MakePrivateReadOnlyField("_path", PredefinedType(Token(SyntaxKind.StringKeyword)));
 
@@ -27,7 +29,7 @@ public partial class DBusSourceGenerator
                 Parameter(
                         Identifier("connection"))
                     .WithType(
-                        IdentifierName("Connection")),
+                        IdentifierName(nameof(Connection))),
                 Parameter(
                         Identifier("destination"))
                     .WithType(
@@ -44,7 +46,7 @@ public partial class DBusSourceGenerator
                     MakeAssignmentExpressionStatement("_destination", "destination"),
                     MakeAssignmentExpressionStatement("_path", "path")));
 
-        cl = cl.AddMembers(interfaceConst, connectionField, destinationField, pathField, ctor);
+        cl = cl.AddMembers(connectionField, destinationField, pathField, ctor);
 
         AddProperties(ref cl, dBusInterface);
         AddProxyMethods(ref cl, dBusInterface);
@@ -61,7 +63,7 @@ public partial class DBusSourceGenerator
         foreach (DBusMethod dBusMethod in dBusInterface.Methods)
         {
             DBusArgument[]? inArgs = dBusMethod.Arguments?.Where(static m => m.Direction is null or "in").ToArray();
-            DBusArgument[]? outArgs = dBusMethod.Arguments?.Where(static m => m.Direction == "out").ToArray();
+            DBusArgument[]? outArgs = dBusMethod.Arguments?.Where(static m => m.Direction is "out").ToArray();
 
             ArgumentListSyntax args = ArgumentList(
                 SingletonSeparatedList(
@@ -83,17 +85,18 @@ public partial class DBusSourceGenerator
                             Argument(
                                 IdentifierName(arg.Name is not null
                                     ? SanitizeIdentifier(
-                                        Camelize(arg.Name.AsSpan()))
+                                        Pascalize(arg.Name.AsSpan(), true))
                                     : $"arg{i}")))))
                 .Cast<StatementSyntax>()
                 .ToArray() ?? [];
 
             BlockSyntax createMessageBody = MakeCreateMessageBody(
-                IdentifierName("Interface"), dBusMethod.Name!, ParseSignature(inArgs), statements);
+                MakeLiteralExpression(dBusInterface.Name!), dBusMethod.Name!, ParseSignature(inArgs), statements);
 
             MethodDeclarationSyntax proxyMethod = MethodDeclaration(
                     ParseTaskReturnType(outArgs), $"{Pascalize(dBusMethod.Name.AsSpan())}Async")
-                .AddModifiers(Token(SyntaxKind.PublicKeyword));
+                .AddModifiers(
+                    Token(SyntaxKind.PublicKeyword));
 
             if (inArgs is not null)
             {
@@ -124,19 +127,19 @@ public partial class DBusSourceGenerator
                     Parameter(
                             Identifier("handler"))
                         .WithType(
-                            GenericName("Action")
+                            GenericName(nameof(Action))
                                 .AddTypeArgumentListArguments(
                                     NullableType(
-                                        IdentifierName("Exception")),
+                                        IdentifierName(nameof(Exception))),
                                     returnType)))
                 : parameters.AddParameters(
                     Parameter(
                             Identifier("handler"))
                         .WithType(
-                            GenericName("Action")
+                            GenericName(nameof(Action))
                                 .AddTypeArgumentListArguments(
                                     NullableType(
-                                        IdentifierName("Exception")))));
+                                        IdentifierName(nameof(Exception))))));
 
             parameters = parameters.AddParameters(
                 Parameter(
@@ -150,10 +153,10 @@ public partial class DBusSourceGenerator
                 Parameter(
                         Identifier("flags"))
                     .WithType(
-                        IdentifierName("ObserverFlags"))
+                        IdentifierName(nameof(ObserverFlags)))
                     .WithDefault(
                         EqualsValueClause(
-                            MakeMemberAccessExpression("ObserverFlags", "None"))));
+                            MakeMemberAccessExpression(nameof(ObserverFlags), nameof(ObserverFlags.None)))));
 
             ArgumentListSyntax arguments = ArgumentList()
                 .AddArguments(
@@ -178,9 +181,9 @@ public partial class DBusSourceGenerator
                     IdentifierName("flags")));
 
             MethodDeclarationSyntax watchSignalMethod = MethodDeclaration(
-                    GenericName("ValueTask")
+                    GenericName(nameof(ValueTask))
                         .AddTypeArgumentListArguments(
-                            IdentifierName("IDisposable")),
+                            IdentifierName(nameof(IDisposable))),
                     $"Watch{Pascalize(dBusSignal.Name.AsSpan())}Async")
                 .AddModifiers(
                     Token(SyntaxKind.PublicKeyword))
@@ -188,11 +191,13 @@ public partial class DBusSourceGenerator
                 .WithBody(
                     Block(
                         LocalDeclarationStatement(
-                            VariableDeclaration(IdentifierName("MatchRule"))
+                            VariableDeclaration(
+                                    IdentifierName(nameof(MatchRule)))
                                 .AddVariables(
                                     VariableDeclarator("rule")
                                         .WithInitializer(
-                                            EqualsValueClause(MakeMatchRule(dBusSignal))))),
+                                            EqualsValueClause(
+                                                MakeMatchRule(dBusSignal, dBusInterface))))),
                         ReturnStatement(
                             InvocationExpression(
                                     MakeMemberAccessExpression("SignalHelper", "WatchSignalAsync"))
@@ -202,39 +207,41 @@ public partial class DBusSourceGenerator
         }
     }
 
-    private static ObjectCreationExpressionSyntax MakeMatchRule(DBusSignal dBusSignal) =>
-        ObjectCreationExpression(IdentifierName("MatchRule"))
+    private static ObjectCreationExpressionSyntax MakeMatchRule(DBusSignal dBusSignal, DBusInterface dBusInterface) =>
+        ObjectCreationExpression(
+                IdentifierName(nameof(MatchRule)))
             .WithInitializer(
                 InitializerExpression(SyntaxKind.ObjectInitializerExpression)
                     .AddExpressions(
                         MakeAssignmentExpression(
-                            IdentifierName("Type"), MakeMemberAccessExpression("MessageType", "Signal")),
+                            IdentifierName(nameof(MatchRule.Type)), MakeMemberAccessExpression(nameof(MessageType), nameof(MessageType.Signal))),
                         MakeAssignmentExpression(
-                            IdentifierName("Sender"), IdentifierName("_destination")),
+                            IdentifierName(nameof(MatchRule.Sender)), IdentifierName("_destination")),
                         MakeAssignmentExpression(
-                            IdentifierName("Path"), IdentifierName("_path")),
+                            IdentifierName(nameof(MatchRule.Path)), IdentifierName("_path")),
                         MakeAssignmentExpression(
-                            IdentifierName("Member"), MakeLiteralExpression(dBusSignal.Name!)),
+                            IdentifierName(nameof(MatchRule.Member)), MakeLiteralExpression(dBusSignal.Name!)),
                         MakeAssignmentExpression(
-                            IdentifierName("Interface"), IdentifierName("Interface"))));
+                            IdentifierName(nameof(MatchRule.Interface)), MakeLiteralExpression(dBusInterface.Name!))));
 
     private void AddWatchPropertiesChanged(ref ClassDeclarationSyntax cl, DBusInterface dBusInterface)
     {
         cl = cl.AddMembers(
             MethodDeclaration(
-                    GenericName("ValueTask")
+                    GenericName(nameof(ValueTask))
                         .AddTypeArgumentListArguments(
-                            IdentifierName("IDisposable")),
+                            IdentifierName(nameof(IDisposable))),
                     "WatchPropertiesChangedAsync")
                 .AddModifiers(
                     Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(
-                    Parameter(Identifier("handler"))
+                    Parameter(
+                            Identifier("handler"))
                         .WithType(
-                            GenericName("Action")
+                            GenericName(nameof(Action))
                                 .AddTypeArgumentListArguments(
                                     NullableType(
-                                        IdentifierName("Exception")),
+                                        IdentifierName(nameof(Exception))),
                                     GenericName("PropertyChanges")
                                         .AddTypeArgumentListArguments(
                                             IdentifierName(
@@ -250,10 +257,10 @@ public partial class DBusSourceGenerator
                     Parameter(
                             Identifier("flags"))
                         .WithType(
-                            IdentifierName("ObserverFlags"))
+                            IdentifierName(nameof(ObserverFlags)))
                         .WithDefault(
                             EqualsValueClause(
-                                MakeMemberAccessExpression("ObserverFlags", "None"))))
+                                MakeMemberAccessExpression(nameof(ObserverFlags), nameof(ObserverFlags.None)))))
                 .WithBody(
                     Block(
                         ReturnStatement(
@@ -266,7 +273,7 @@ public partial class DBusSourceGenerator
                                         IdentifierName("_destination")),
                                     Argument(IdentifierName("_path")),
                                     Argument(
-                                        IdentifierName("Interface")),
+                                        MakeLiteralExpression(dBusInterface.Name!)),
                                     Argument(
                                         IdentifierName("ReadMessage")),
                                     Argument(
@@ -287,7 +294,7 @@ public partial class DBusSourceGenerator
                                 Parameter(
                                         Identifier("message"))
                                     .WithType(
-                                        IdentifierName("Message")),
+                                        IdentifierName(nameof(Message))),
                                 Parameter(
                                         Identifier("_"))
                                     .WithType(
@@ -296,19 +303,20 @@ public partial class DBusSourceGenerator
                             .WithBody(
                                 Block(
                                     LocalDeclarationStatement(
-                                        VariableDeclaration(IdentifierName("Reader"))
+                                        VariableDeclaration(
+                                                IdentifierName(nameof(Reader)))
                                             .AddVariables(
                                                 VariableDeclarator("reader")
                                                     .WithInitializer(
                                                         EqualsValueClause(
                                                             InvocationExpression(
-                                                                MakeMemberAccessExpression("message", "GetBodyReader")))))),
+                                                                MakeMemberAccessExpression("message", nameof(Message.GetBodyReader))))))),
                                     ExpressionStatement(
                                         InvocationExpression(
-                                            MakeMemberAccessExpression("reader", "ReadString"))),
+                                            MakeMemberAccessExpression("reader", nameof(Reader.ReadString)))),
                                     LocalDeclarationStatement(
                                         VariableDeclaration(
-                                                GenericName("List")
+                                                GenericName(nameof(System.Collections.Generic.List<>))
                                                     .AddTypeArgumentListArguments(
                                                         PredefinedType(Token(SyntaxKind.StringKeyword))))
                                             .AddVariables(
@@ -318,20 +326,25 @@ public partial class DBusSourceGenerator
                                                             ImplicitObjectCreationExpression())))),
                                     ReturnStatement(
                                         InvocationExpression(
-                                                ObjectCreationExpression(GenericName("PropertyChanges")
-                                                    .AddTypeArgumentListArguments(
-                                                        IdentifierName(
-                                                            GetPropertiesClassIdentifier(dBusInterface)))))
+                                                ObjectCreationExpression(
+                                                    GenericName("PropertyChanges")
+                                                        .AddTypeArgumentListArguments(
+                                                            IdentifierName(
+                                                                GetPropertiesClassIdentifier(dBusInterface)))))
                                             .AddArgumentListArguments(
-                                                Argument(InvocationExpression(
-                                                        IdentifierName("ReadProperties"))
-                                                    .AddArgumentListArguments(
-                                                        Argument(IdentifierName("reader"))
-                                                            .WithRefKindKeyword(Token(SyntaxKind.RefKeyword)),
-                                                        Argument(IdentifierName("changed")))),
                                                 Argument(
                                                     InvocationExpression(
-                                                        MakeMemberAccessExpression("changed", "ToArray"))),
+                                                            IdentifierName("ReadProperties"))
+                                                        .AddArgumentListArguments(
+                                                            Argument(
+                                                                    IdentifierName("reader"))
+                                                                .WithRefKindKeyword(
+                                                                    Token(SyntaxKind.RefKeyword)),
+                                                            Argument(
+                                                                IdentifierName("changed")))),
+                                                Argument(
+                                                    InvocationExpression(
+                                                        MakeMemberAccessExpression("changed", nameof(System.Collections.Generic.List<>.ToArray)))),
                                                 Argument(
                                                     InvocationExpression(
                                                         MakeMemberAccessExpression("reader",
@@ -345,9 +358,9 @@ public partial class DBusSourceGenerator
 
         cl = dBusInterface.Properties!.Aggregate(cl, (current, dBusProperty) => dBusProperty.Access switch
         {
-            "read" => current.AddMembers(MakeGetMethod(dBusProperty)),
-            "write" => current.AddMembers(MakeSetMethod(dBusProperty)),
-            "readwrite" => current.AddMembers(MakeGetMethod(dBusProperty), MakeSetMethod(dBusProperty)),
+            "read" => current.AddMembers(MakeGetMethod(dBusInterface, dBusProperty)),
+            "write" => current.AddMembers(MakeSetMethod(dBusInterface, dBusProperty)),
+            "readwrite" => current.AddMembers(MakeGetMethod(dBusInterface, dBusProperty), MakeSetMethod(dBusInterface, dBusProperty)),
             _ => current
         });
 
@@ -357,22 +370,22 @@ public partial class DBusSourceGenerator
         AddWatchPropertiesChanged(ref cl, dBusInterface);
     }
 
-    private MethodDeclarationSyntax MakeGetMethod(DBusProperty dBusProperty)
+    private MethodDeclarationSyntax MakeGetMethod(DBusInterface dBusInterface, DBusProperty dBusProperty)
     {
         BlockSyntax createMessageBody = MakeCreateMessageBody(
             MakeLiteralExpression("org.freedesktop.DBus.Properties"), "Get", "ss",
             ExpressionStatement(
                 InvocationExpression(
-                        MakeMemberAccessExpression("writer", "WriteString"))
+                        MakeMemberAccessExpression("writer", nameof(MessageWriter.WriteString)))
                     .AddArgumentListArguments(
                         Argument(
-                            IdentifierName("Interface")))),
+                            MakeUtf8StringLiteralExpression(dBusInterface.Name!)))),
             ExpressionStatement(
                 InvocationExpression(
-                        MakeMemberAccessExpression("writer", "WriteString"))
+                        MakeMemberAccessExpression("writer", nameof(MessageWriter.WriteString)))
                     .AddArgumentListArguments(
                         Argument(
-                            MakeLiteralExpression(dBusProperty.Name!)))));
+                            MakeUtf8StringLiteralExpression(dBusProperty.Name!)))));
 
         ArgumentListSyntax args = ArgumentList()
             .AddArguments(
@@ -390,22 +403,22 @@ public partial class DBusSourceGenerator
                 MakeCallMethodReturnBody(args, createMessageBody));
     }
 
-    private MethodDeclarationSyntax MakeSetMethod(DBusProperty dBusProperty)
+    private MethodDeclarationSyntax MakeSetMethod(DBusInterface dBusInterface, DBusProperty dBusProperty)
     {
         BlockSyntax createMessageBody = MakeCreateMessageBody(
             MakeLiteralExpression("org.freedesktop.DBus.Properties"), "Set", "ssv",
             ExpressionStatement(
                 InvocationExpression(
-                        MakeMemberAccessExpression("writer", "WriteString"))
+                        MakeMemberAccessExpression("writer", nameof(MessageWriter.WriteString)))
                     .AddArgumentListArguments(
                         Argument(
-                            IdentifierName("Interface")))),
+                            MakeUtf8StringLiteralExpression(dBusInterface.Name!)))),
             ExpressionStatement(
                 InvocationExpression(
-                        MakeMemberAccessExpression("writer", "WriteString"))
+                        MakeMemberAccessExpression("writer", nameof(MessageWriter.WriteString)))
                     .AddArgumentListArguments(
                         Argument(
-                            MakeLiteralExpression(
+                            MakeUtf8StringLiteralExpression(
                                 Pascalize(dBusProperty.Name.AsSpan()))))),
             ExpressionStatement(
                 InvocationExpression(
@@ -421,7 +434,7 @@ public partial class DBusSourceGenerator
                         IdentifierName("CreateMessage")))));
 
         return MethodDeclaration(
-                IdentifierName("Task"),
+                IdentifierName(nameof(Task)),
                 $"Set{Pascalize(dBusProperty.Name.AsSpan())}PropertyAsync")
             .AddModifiers(
                 Token(SyntaxKind.PublicKeyword))
@@ -440,17 +453,17 @@ public partial class DBusSourceGenerator
             MakeLiteralExpression("org.freedesktop.DBus.Properties"), "GetAll", "s",
             ExpressionStatement(
                 InvocationExpression(
-                        MakeMemberAccessExpression("writer", "WriteString"))
+                        MakeMemberAccessExpression("writer", nameof(MessageWriter.WriteString)))
                     .AddArgumentListArguments(
                         Argument(
-                            IdentifierName("Interface")))));
+                            MakeUtf8StringLiteralExpression(dBusInterface.Name!)))));
 
         ParenthesizedLambdaExpressionSyntax messageValueReaderLambda = ParenthesizedLambdaExpression()
             .AddParameterListParameters(
                 Parameter(
                         Identifier("message"))
                     .WithType(
-                        IdentifierName("Message")),
+                        IdentifierName(nameof(Message))),
                 Parameter(
                         Identifier("state"))
                     .WithType(
@@ -460,23 +473,26 @@ public partial class DBusSourceGenerator
             .WithBody(
                 Block(
                     LocalDeclarationStatement(
-                        VariableDeclaration(IdentifierName("Reader"))
+                        VariableDeclaration(
+                                IdentifierName(nameof(Reader)))
                             .AddVariables(
                                 VariableDeclarator("reader")
                                     .WithInitializer(
                                         EqualsValueClause(
                                             InvocationExpression(
-                                                MakeMemberAccessExpression("message", "GetBodyReader")))))),
+                                                MakeMemberAccessExpression("message", nameof(Message.GetBodyReader))))))),
                     ReturnStatement(
                         InvocationExpression(
                                 IdentifierName("ReadProperties"))
                             .AddArgumentListArguments(
-                                Argument(IdentifierName("reader"))
-                                    .WithRefKindKeyword(Token(SyntaxKind.RefKeyword))))));
+                                Argument(
+                                        IdentifierName("reader"))
+                                    .WithRefKindKeyword(
+                                        Token(SyntaxKind.RefKeyword))))));
 
         cl = cl.AddMembers(
             MethodDeclaration(
-                    GenericName("Task")
+                    GenericName(nameof(Task))
                         .AddTypeArgumentListArguments(
                             IdentifierName(
                                 GetPropertiesClassIdentifier(dBusInterface))),
@@ -486,12 +502,12 @@ public partial class DBusSourceGenerator
                     Block(
                         ReturnStatement(
                             InvocationExpression(
-                                    MakeMemberAccessExpression("_connection", "CallMethodAsync"))
+                                    MakeMemberAccessExpression("_connection", nameof(Connection.CallMethodAsync)))
                                 .AddArgumentListArguments(
                                     Argument(
                                         InvocationExpression(IdentifierName("CreateGetAllMessage"))),
                                     Argument(messageValueReaderLambda))),
-                        LocalFunctionStatement(IdentifierName("MessageBuffer"), "CreateGetAllMessage")
+                        LocalFunctionStatement(IdentifierName(nameof(MessageBuffer)), "CreateGetAllMessage")
                             .WithBody(createGetAllMessageBody))));
     }
 
@@ -527,14 +543,14 @@ public partial class DBusSourceGenerator
                     Parameter(
                             Identifier("reader"))
                         .WithType(
-                            IdentifierName("Reader"))
+                            IdentifierName(nameof(Reader)))
                         .AddModifiers(
                             Token(SyntaxKind.RefKeyword)),
                     Parameter
                             (Identifier("changed"))
                         .WithType(
                             NullableType(
-                                GenericName("List")
+                                GenericName(nameof(System.Collections.Generic.List<>))
                                     .AddTypeArgumentListArguments(
                                         PredefinedType(
                                             Token(SyntaxKind.StringKeyword)))))
@@ -555,27 +571,28 @@ public partial class DBusSourceGenerator
                                                     ObjectCreationExpression(
                                                         IdentifierName(
                                                             GetPropertiesClassIdentifier(dBusInterface)))))))),
-                        LocalDeclarationStatement(VariableDeclaration(
-                                IdentifierName("ArrayEnd"))
-                            .AddVariables(
-                                VariableDeclarator("headersEnd")
-                                    .WithInitializer(
-                                        EqualsValueClause(
-                                            InvocationExpression(
-                                                    MakeMemberAccessExpression("reader", "ReadArrayStart"))
-                                                .AddArgumentListArguments(
-                                                    Argument(
-                                                        MakeMemberAccessExpression("DBusType", "Struct"))))))),
+                        LocalDeclarationStatement(
+                            VariableDeclaration(
+                                    IdentifierName(nameof(ArrayEnd)))
+                                .AddVariables(
+                                    VariableDeclarator("headersEnd")
+                                        .WithInitializer(
+                                            EqualsValueClause(
+                                                InvocationExpression(
+                                                        MakeMemberAccessExpression("reader", nameof(Reader.ReadArrayStart)))
+                                                    .AddArgumentListArguments(
+                                                        Argument(
+                                                            MakeMemberAccessExpression(nameof(DBusType), nameof(DBusType.Struct)))))))),
                         WhileStatement(
                             InvocationExpression(
-                                    MakeMemberAccessExpression("reader", "HasNext"))
+                                    MakeMemberAccessExpression("reader", nameof(Reader.HasNext)))
                                 .AddArgumentListArguments(
                                     Argument(
                                         IdentifierName("headersEnd"))),
                             Block(
                                 SwitchStatement(
                                         InvocationExpression(
-                                            MakeMemberAccessExpression("reader", "ReadString")))
+                                            MakeMemberAccessExpression("reader", nameof(Reader.ReadString))))
                                     .WithSections(
                                         List(
                                             dBusInterface.Properties!.Select(property => SwitchSection()
@@ -585,7 +602,7 @@ public partial class DBusSourceGenerator
                                                 .AddStatements(
                                                     ExpressionStatement(
                                                         InvocationExpression(
-                                                                MakeMemberAccessExpression("reader", "ReadSignature"))
+                                                                MakeMemberAccessExpression("reader", nameof(Reader.ReadSignature)))
                                                             .AddArgumentListArguments(
                                                                 Argument(
                                                                     MakeLiteralExpression(property.Type!)))),
@@ -614,9 +631,9 @@ public partial class DBusSourceGenerator
         Block(
             ReturnStatement(
                 InvocationExpression(
-                        MakeMemberAccessExpression("_connection", "CallMethodAsync"))
+                        MakeMemberAccessExpression("_connection", nameof(Connection.CallMethodAsync)))
                     .WithArgumentList(args)),
-            LocalFunctionStatement(IdentifierName("MessageBuffer"), "CreateMessage")
+            LocalFunctionStatement(IdentifierName(nameof(MessageBuffer)), "CreateMessage")
                 .WithBody(createMessageBody));
 
     private static BlockSyntax MakeCreateMessageBody(ExpressionSyntax interfaceExpression, string methodName, string? signature, params StatementSyntax[] statements)
@@ -641,29 +658,31 @@ public partial class DBusSourceGenerator
         return Block(
                 LocalDeclarationStatement(
                     VariableDeclaration(
-                        IdentifierName("MessageWriter"),
+                        IdentifierName(nameof(MessageWriter)),
                         SingletonSeparatedList(
                             VariableDeclarator("writer")
-                                .WithInitializer(EqualsValueClause(
-                                    InvocationExpression(
-                                        MakeMemberAccessExpression("_connection", "GetMessageWriter"))))))),
+                                .WithInitializer(
+                                    EqualsValueClause(
+                                        InvocationExpression(
+                                            MakeMemberAccessExpression("_connection", "GetMessageWriter"))))))),
                 ExpressionStatement(
                     InvocationExpression(
-                            MakeMemberAccessExpression("writer", "WriteMethodCallHeader"))
+                            MakeMemberAccessExpression("writer", nameof(MessageWriter.WriteMethodCallHeader)))
                         .WithArgumentList(args)))
             .AddStatements(statements)
             .AddStatements(
                 LocalDeclarationStatement(
-                    VariableDeclaration(IdentifierName("MessageBuffer"))
+                    VariableDeclaration(
+                            IdentifierName(nameof(MessageBuffer)))
                         .AddVariables(
                             VariableDeclarator("message")
                                 .WithInitializer(
                                     EqualsValueClause(
                                         InvocationExpression(
-                                            MakeMemberAccessExpression("writer", "CreateMessage")))))),
+                                            MakeMemberAccessExpression("writer", nameof(MessageWriter.CreateMessage))))))),
                 ExpressionStatement(
                     InvocationExpression(
-                        MakeMemberAccessExpression("writer", "Dispose"))),
+                        MakeMemberAccessExpression("writer", nameof(MessageWriter.Dispose)))),
                 ReturnStatement(
                     IdentifierName("message")));
     }

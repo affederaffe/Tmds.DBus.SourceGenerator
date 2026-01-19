@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using Tmds.DBus.Protocol;
 
 namespace Tmds.DBus.SourceGenerator;
 
