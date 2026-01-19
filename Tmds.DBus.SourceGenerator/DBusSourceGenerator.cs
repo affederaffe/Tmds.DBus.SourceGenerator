@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Xml;
@@ -8,24 +7,16 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using static Tmds.DBus.SourceGenerator.DBusSourceGeneratorUtils;
 
 
 namespace Tmds.DBus.SourceGenerator;
 
 [Generator]
-public partial class DBusSourceGenerator : IIncrementalGenerator
+public class DBusSourceGenerator : IIncrementalGenerator
 {
-    private readonly object _readMethodExtensionsLock = new();
-    private readonly object _writeMethodExtensionsLock = new();
-
-    private Dictionary<string, MethodDeclarationSyntax> _readMethodExtensions = null!;
-    private Dictionary<string, MethodDeclarationSyntax> _writeMethodExtensions = null!;
-
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        _readMethodExtensions = new Dictionary<string, MethodDeclarationSyntax>();
-        _writeMethodExtensions = new Dictionary<string, MethodDeclarationSyntax>();
-
         XmlSerializer xmlSerializer = new(typeof(DBusNode));
         XmlReaderSettings xmlReaderSettings = new()
         {
@@ -34,12 +25,15 @@ public partial class DBusSourceGenerator : IIncrementalGenerator
             IgnoreComments = true
         };
 
+        ReadWriteMethodsCache readWriteMethodsCache = new();
+
         context.RegisterPostInitializationOutput(initializationContext =>
         {
-            initializationContext.AddSource("Tmds.DBus.SourceGenerator.PropertyChanges.cs", PropertyChangesClass);
-            initializationContext.AddSource("Tmds.DBus.SourceGenerator.SignalHelper.cs", SignalHelperClass);
-            initializationContext.AddSource("Tmds.DBus.SourceGenerator.PathHandler.cs", PathHandlerClass);
-            initializationContext.AddSource("Tmds.DBus.SourceGenerator.IDBusInterfaceHandler.cs", DBusInterfaceHandlerInterface);
+            initializationContext.AddSource("Tmds.DBus.SourceGenerator.PropertyChanges.cs", DBusSourceGeneratorClasses.PropertyChangesClass);
+            initializationContext.AddSource("Tmds.DBus.SourceGenerator.SignalHelper.cs", DBusSourceGeneratorClasses.SignalHelperClass);
+            initializationContext.AddSource("Tmds.DBus.SourceGenerator.PathHandler.cs", DBusSourceGeneratorClasses.PathHandlerClass);
+            initializationContext.AddSource("Tmds.DBus.SourceGenerator.IDBusInterfaceHandler.cs", DBusSourceGeneratorClasses.DBusInterfaceHandlerInterface);
+            initializationContext.AddSource("Tmds.DBus.SourceGenerator.WriterExtension.WriteNullableString.cs", DBusSourceGeneratorClasses.WriteNullableStringWriterExtension);
         });
 
         IncrementalValuesProvider<(DBusNode Node, string GeneratorMode)> generatorProvider = context.AdditionalTextsProvider
@@ -49,7 +43,9 @@ public partial class DBusSourceGenerator : IIncrementalGenerator
             {
                 if (!x.Right.GetOptions(x.Left).TryGetValue("build_metadata.AdditionalFiles.DBusGeneratorMode", out string? generatorMode))
                     return default;
-                if (xmlSerializer.Deserialize(XmlReader.Create(new StringReader(x.Left.GetText()!.ToString()), xmlReaderSettings)) is not DBusNode dBusNode)
+                StringReader sr = new(x.Left.GetText()!.ToString());
+                XmlReader xmlReader = XmlReader.Create(sr, xmlReaderSettings);
+                if (xmlSerializer.Deserialize(xmlReader) is not DBusNode dBusNode)
                     return default;
                 return dBusNode.Interfaces is null ? default : ValueTuple.Create(dBusNode, generatorMode);
             })
@@ -57,36 +53,16 @@ public partial class DBusSourceGenerator : IIncrementalGenerator
 
         context.RegisterSourceOutput(generatorProvider.Collect(), (productionContext, provider) =>
         {
-            if (provider.IsEmpty)
-                return;
-
-            foreach ((DBusNode Node, string GeneratorMode) value in provider)
+            DBusSourceGeneratorUnit unit = new(productionContext, readWriteMethodsCache);
+            foreach ((DBusNode node, string generatorMode) in provider)
             {
-                switch (value.GeneratorMode)
+                switch (generatorMode)
                 {
                     case "Proxy":
-                        foreach (DBusInterface dBusInterface in value.Node.Interfaces!)
-                        {
-                            TypeDeclarationSyntax typeDeclarationSyntax = GenerateProxy(dBusInterface);
-                            NamespaceDeclarationSyntax namespaceDeclaration = NamespaceDeclaration(
-                                    IdentifierName("Tmds.DBus.SourceGenerator"))
-                                .AddMembers(typeDeclarationSyntax);
-                            CompilationUnitSyntax compilationUnit = MakeCompilationUnit(namespaceDeclaration);
-                            productionContext.AddSource($"Tmds.DBus.SourceGenerator.{Pascalize(dBusInterface.Name.AsSpan())}Proxy.g.cs", compilationUnit.GetText(Encoding.UTF8));
-                        }
-
+                        unit.GenerateProxyFromNode(node);
                         break;
                     case "Handler":
-                        foreach (DBusInterface dBusInterface in value.Node.Interfaces!)
-                        {
-                            TypeDeclarationSyntax typeDeclarationSyntax = GenerateHandler(dBusInterface);
-                            NamespaceDeclarationSyntax namespaceDeclaration = NamespaceDeclaration(
-                                    IdentifierName("Tmds.DBus.SourceGenerator"))
-                                .AddMembers(typeDeclarationSyntax);
-                            CompilationUnitSyntax compilationUnit = MakeCompilationUnit(namespaceDeclaration);
-                            productionContext.AddSource($"Tmds.DBus.SourceGenerator.{Pascalize(dBusInterface.Name.AsSpan())}Handler.g.cs", compilationUnit.GetText(Encoding.UTF8));
-                        }
-
+                        unit.GenerateHandlerFromNode(node);
                         break;
                 }
             }
@@ -98,8 +74,7 @@ public partial class DBusSourceGenerator : IIncrementalGenerator
                         ClassDeclaration("ReaderExtensions")
                             .AddModifiers(
                                 Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.StaticKeyword))
-                            .WithMembers(
-                                List<MemberDeclarationSyntax>(_readMethodExtensions.Values))));
+                            .WithMembers(readWriteMethodsCache.GetReadMethods())));
 
             CompilationUnitSyntax writerExtensions = MakeCompilationUnit(
                 NamespaceDeclaration(
@@ -107,10 +82,10 @@ public partial class DBusSourceGenerator : IIncrementalGenerator
                     .AddMembers(
                         ClassDeclaration("WriterExtensions")
                             .AddModifiers(
-                                Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.StaticKeyword))
-                            .WithMembers(
-                                List<MemberDeclarationSyntax>(_writeMethodExtensions.Values)
-                                    .Add(MakeWriteNullableStringMethod()))));
+                                Token(SyntaxKind.InternalKeyword),
+                                Token(SyntaxKind.StaticKeyword),
+                                Token(SyntaxKind.PartialKeyword))
+                            .WithMembers(readWriteMethodsCache.GetWriteMethods())));
 
             productionContext.AddSource("Tmds.DBus.SourceGenerator.ReaderExtensions.cs", readerExtensions.GetText(Encoding.UTF8));
             productionContext.AddSource("Tmds.DBus.SourceGenerator.WriterExtensions.cs", writerExtensions.GetText(Encoding.UTF8));

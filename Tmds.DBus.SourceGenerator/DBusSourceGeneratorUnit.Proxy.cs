@@ -5,11 +5,13 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Tmds.DBus.Protocol;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using static Tmds.DBus.SourceGenerator.DBusSourceGeneratorUtils;
+using static Tmds.DBus.SourceGenerator.DBusSourceGeneratorParsing;
 
 
 namespace Tmds.DBus.SourceGenerator;
 
-public partial class DBusSourceGenerator
+public partial class DBusSourceGeneratorUnit
 {
     private ClassDeclarationSyntax GenerateProxy(DBusInterface dBusInterface)
     {
@@ -62,8 +64,8 @@ public partial class DBusSourceGenerator
 
         foreach (DBusMethod dBusMethod in dBusInterface.Methods)
         {
-            DBusArgument[]? inArgs = dBusMethod.Arguments?.Where(static m => m.Direction is null or "in").ToArray();
-            DBusArgument[]? outArgs = dBusMethod.Arguments?.Where(static m => m.Direction is "out").ToArray();
+            DBusArgument[]? inArgs = GetInArgs(dBusMethod.Arguments);
+            DBusArgument[]? outArgs = GetOutArgs(dBusMethod.Arguments);
 
             ArgumentListSyntax args = ArgumentList(
                 SingletonSeparatedList(
@@ -75,12 +77,12 @@ public partial class DBusSourceGenerator
             {
                 args = args.AddArguments(
                     Argument(
-                        MakeMemberAccessExpression("ReaderExtensions", GetOrAddReadMessageMethod(outArgs))));
+                        MakeMemberAccessExpression("ReaderExtensions", readWriteMethodsCache.GetOrAddReadMessageMethod(outArgs))));
             }
 
             StatementSyntax[] statements = inArgs?.Select((arg, i) => ExpressionStatement(
                     InvocationExpression(
-                            MakeMemberAccessExpression("writer", GetOrAddWriteMethod(arg.DBusDotnetType)))
+                            MakeMemberAccessExpression("writer", readWriteMethodsCache.GetOrAddWriteMethod(arg.DBusDotnetType)))
                         .AddArgumentListArguments(
                             Argument(
                                 IdentifierName(arg.Name is not null
@@ -169,7 +171,7 @@ public partial class DBusSourceGenerator
             {
                 arguments = arguments.AddArguments(
                     Argument(
-                        MakeMemberAccessExpression("ReaderExtensions", GetOrAddReadMessageMethod(outArgs))));
+                        MakeMemberAccessExpression("ReaderExtensions", readWriteMethodsCache.GetOrAddReadMessageMethod(outArgs))));
             }
 
             arguments = arguments.AddArguments(
@@ -348,7 +350,7 @@ public partial class DBusSourceGenerator
                                                 Argument(
                                                     InvocationExpression(
                                                         MakeMemberAccessExpression("reader",
-                                                            GetOrAddReadMethod(DBusDotnetType.StringArrayType)))))))))));
+                                                            readWriteMethodsCache.GetOrAddReadMethod(DBusDotnetType.StringArrayType)))))))))));
     }
 
     private void AddProperties(ref ClassDeclarationSyntax cl, DBusInterface dBusInterface)
@@ -394,7 +396,7 @@ public partial class DBusSourceGenerator
                         IdentifierName("CreateMessage"))),
                 Argument(
                     MakeMemberAccessExpression(
-                        "ReaderExtensions", GetOrAddReadMessageMethod(dBusProperty, true))));
+                        "ReaderExtensions", readWriteMethodsCache.GetOrAddReadMessageMethod([dBusProperty], true))));
 
         return MethodDeclaration(
                 ParseTaskReturnType([dBusProperty]), $"Get{Pascalize(dBusProperty.Name.AsSpan())}PropertyAsync")
@@ -422,7 +424,7 @@ public partial class DBusSourceGenerator
                                 Pascalize(dBusProperty.Name.AsSpan()))))),
             ExpressionStatement(
                 InvocationExpression(
-                        MakeMemberAccessExpression("writer", GetOrAddWriteVariantMethod(dBusProperty)))
+                        MakeMemberAccessExpression("writer", readWriteMethodsCache.GetOrAddWriteVariantMethod(dBusProperty)))
                     .AddArgumentListArguments(
                         Argument(
                             IdentifierName("value")))));
@@ -521,8 +523,7 @@ public partial class DBusSourceGenerator
         propertiesClass = dBusInterface.Properties!.Aggregate(propertiesClass, static (current, property) =>
             current.AddMembers(
                 MakeGetSetProperty(
-                    DBusDotnetType.FromDBusValue(property)
-                        .ToTypeSyntax(),
+                    property.DBusDotnetType .ToTypeSyntax(),
                     Pascalize(property.Name.AsSpan()),
                     Token(SyntaxKind.PublicKeyword))));
 
@@ -610,9 +611,7 @@ public partial class DBusSourceGenerator
                                                         AssignmentExpression(SyntaxKind.SimpleAssignmentExpression,
                                                             MakeMemberAccessExpression("props", Pascalize(property.Name.AsSpan())),
                                                             InvocationExpression(
-                                                                MakeMemberAccessExpression("reader",
-                                                                    GetOrAddReadMethod(DBusDotnetType
-                                                                        .FromDBusValue(property)))))),
+                                                                MakeMemberAccessExpression("reader", readWriteMethodsCache.GetOrAddReadMethod(property.DBusDotnetType))))),
                                                     ExpressionStatement(
                                                         ConditionalAccessExpression(
                                                             IdentifierName("changed"), InvocationExpression(

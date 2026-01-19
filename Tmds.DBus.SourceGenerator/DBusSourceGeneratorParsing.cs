@@ -13,7 +13,7 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Tmds.DBus.SourceGenerator;
 
-public partial class DBusSourceGenerator
+public static class DBusSourceGeneratorParsing
 {
     public enum DotnetType
     {
@@ -36,7 +36,7 @@ public partial class DBusSourceGenerator
         SafeFileHandle
     }
 
-    private static string Pascalize(ReadOnlySpan<char> name, bool camel = false)
+    internal static string Pascalize(ReadOnlySpan<char> name, bool camel = false)
     {
         bool upperizeNext = !camel;
         StringBuilder sb = new(name.Length);
@@ -61,7 +61,7 @@ public partial class DBusSourceGenerator
     }
 
     [return: NotNullIfNotNull(nameof(dbusValues))]
-    private static string? ParseSignature(IReadOnlyList<DBusValue>? dbusValues)
+    internal static string? ParseSignature(IReadOnlyList<DBusValue>? dbusValues)
     {
         if (dbusValues is null || dbusValues.Count == 0)
             return null;
@@ -74,7 +74,7 @@ public partial class DBusSourceGenerator
     }
 
     [return: NotNullIfNotNull(nameof(dbusValues))]
-    private static TypeSyntax? ParseReturnType(IReadOnlyList<DBusValue>? dbusValues)
+    internal static TypeSyntax? ParseReturnType(IReadOnlyList<DBusValue>? dbusValues)
     {
         return dbusValues?.Count switch
         {
@@ -93,7 +93,7 @@ public partial class DBusSourceGenerator
         };
     }
 
-    private static TypeSyntax ParseTaskReturnType(IReadOnlyList<DBusValue>? dbusValues)
+    internal static TypeSyntax ParseTaskReturnType(IReadOnlyList<DBusValue>? dbusValues)
     {
         return dbusValues?.Count switch
         {
@@ -104,7 +104,7 @@ public partial class DBusSourceGenerator
         };
     }
 
-    private static TypeSyntax ParseValueTaskReturnType(IReadOnlyList<DBusValue>? dbusValues)
+    internal static TypeSyntax ParseValueTaskReturnType(IReadOnlyList<DBusValue>? dbusValues)
     {
         return dbusValues?.Count switch
         {
@@ -115,7 +115,7 @@ public partial class DBusSourceGenerator
         };
     }
 
-    private static TypeSyntax ParseTaskCompletionSourceType(IReadOnlyList<DBusValue>? dbusValues)
+    internal static TypeSyntax ParseTaskCompletionSourceType(IReadOnlyList<DBusValue>? dbusValues)
     {
         return dbusValues?.Count switch
         {
@@ -129,7 +129,7 @@ public partial class DBusSourceGenerator
         };
     }
 
-    private static ParameterSyntax[] ParseParameterList(IReadOnlyList<DBusValue> inArgs)
+    internal static ParameterSyntax[] ParseParameterList(IReadOnlyList<DBusValue> inArgs)
     {
         return inArgs.Select((dbusValue, i) =>
                 Parameter(
@@ -142,19 +142,19 @@ public partial class DBusSourceGenerator
             .ToArray();
     }
 
-    private static string SanitizeSignature(in string signature) =>
+    internal static string SanitizeSignature(in string signature) =>
         signature.Replace('{', 'e')
             .Replace("}", null)
             .Replace('(', 'r')
             .Replace(')', 'z');
 
-    private static string SanitizeIdentifier(in string identifier)
+    internal static string SanitizeIdentifier(in string identifier)
     {
         bool isAnyKeyword = SyntaxFacts.GetKeywordKind(identifier) != SyntaxKind.None || SyntaxFacts.GetContextualKeywordKind(identifier) != SyntaxKind.None;
         return isAnyKeyword ? $"@{identifier}" : identifier;
     }
 
-    private static string GetPropertiesClassIdentifier(DBusInterface dBusInterface) => $"{Pascalize(dBusInterface.Name.AsSpan())}Properties";
+    internal static string GetPropertiesClassIdentifier(DBusInterface dBusInterface) => $"{Pascalize(dBusInterface.Name.AsSpan())}Properties";
 
     public class DBusDotnetType
     {

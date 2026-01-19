@@ -10,11 +10,13 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Tmds.DBus.Protocol;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using static Tmds.DBus.SourceGenerator.DBusSourceGeneratorUtils;
+using static Tmds.DBus.SourceGenerator.DBusSourceGeneratorParsing;
 
 
 namespace Tmds.DBus.SourceGenerator;
 
-public partial class DBusSourceGenerator
+public partial class DBusSourceGeneratorUnit
 {
     private ClassDeclarationSyntax GenerateHandler(DBusInterface dBusInterface)
     {
@@ -92,8 +94,8 @@ public partial class DBusSourceGenerator
 
         foreach (DBusMethod dBusMethod in dBusInterface.Methods)
         {
-            DBusArgument[]? inArgs = dBusMethod.Arguments?.Where(static m => m.Direction is null or "in").ToArray();
-            DBusArgument[]? outArgs = dBusMethod.Arguments?.Where(static m => m.Direction == "out").ToArray();
+            DBusArgument[]? inArgs = GetInArgs(dBusMethod.Arguments);
+            DBusArgument[]? outArgs = GetOutArgs(dBusMethod.Arguments);
 
             SwitchSectionSyntax switchSection = SwitchSection()
                 .AddLabels(
@@ -167,7 +169,7 @@ public partial class DBusSourceGenerator
                     readParametersMethodBlock = readParametersMethodBlock.AddStatements(
                         ExpressionStatement(
                             AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(identifier), InvocationExpression(
-                                MakeMemberAccessExpression("reader", GetOrAddReadMethod(inArgs[i].DBusDotnetType))))));
+                                MakeMemberAccessExpression("reader", readWriteMethodsCache.GetOrAddReadMethod(inArgs[i].DBusDotnetType))))));
                     argFields[i] = LocalDeclarationStatement(
                         VariableDeclaration(inArgs[i].DBusDotnetType.ToTypeSyntax())
                             .AddVariables(
@@ -311,7 +313,7 @@ public partial class DBusSourceGenerator
                 replyMethodBlock = replyMethodBlock.AddStatements(
                     ExpressionStatement(
                         InvocationExpression(
-                                MakeMemberAccessExpression("writer", GetOrAddWriteMethod(outArgs[0].DBusDotnetType)))
+                                MakeMemberAccessExpression("writer", readWriteMethodsCache.GetOrAddWriteMethod(outArgs[0].DBusDotnetType)))
                             .AddArgumentListArguments(
                                 Argument(
                                     IdentifierName("ret")))));
@@ -323,7 +325,7 @@ public partial class DBusSourceGenerator
                     replyMethodBlock = replyMethodBlock.AddStatements(
                         ExpressionStatement(
                             InvocationExpression(
-                                    MakeMemberAccessExpression("writer", GetOrAddWriteMethod(outArgs[i].DBusDotnetType)))
+                                    MakeMemberAccessExpression("writer", readWriteMethodsCache.GetOrAddWriteMethod(outArgs[i].DBusDotnetType)))
                                 .AddArgumentListArguments(
                                     Argument(
                                         MakeMemberAccessExpression("ret", outArgs[i].Name is not null
@@ -458,7 +460,7 @@ public partial class DBusSourceGenerator
                                             MakeUtf8StringLiteralExpression(property.Type!)))),
                             ExpressionStatement(
                                 InvocationExpression(
-                                        MakeMemberAccessExpression("writer", GetOrAddWriteMethod(property.DBusDotnetType)))
+                                        MakeMemberAccessExpression("writer", readWriteMethodsCache.GetOrAddWriteMethod(property.DBusDotnetType)))
                                     .AddArgumentListArguments(
                                         Argument(
                                             IdentifierName(
@@ -521,7 +523,7 @@ public partial class DBusSourceGenerator
                                 IdentifierName(
                                     Pascalize(property.Name.AsSpan())),
                                 InvocationExpression(
-                                    MakeMemberAccessExpression("reader", GetOrAddReadMethod(property.DBusDotnetType))))))))
+                                    MakeMemberAccessExpression("reader", readWriteMethodsCache.GetOrAddReadMethod(property.DBusDotnetType))))))))
             );
 
         setPropertyMethod = setPropertyMethod.WithBody(setPropertyBody);
@@ -590,8 +592,7 @@ public partial class DBusSourceGenerator
                                                         MakeUtf8StringLiteralExpression(property.Type!)))),
                                         ExpressionStatement(
                                             InvocationExpression(
-                                                    MakeMemberAccessExpression("writer",
-                                                        GetOrAddWriteMethod(property.DBusDotnetType)))
+                                                    MakeMemberAccessExpression("writer", readWriteMethodsCache.GetOrAddWriteMethod(property.DBusDotnetType)))
                                                 .AddArgumentListArguments(
                                                     Argument(
                                                         IdentifierName(
@@ -711,7 +712,7 @@ public partial class DBusSourceGenerator
                     body = body.AddStatements(
                         ExpressionStatement(
                             InvocationExpression(
-                                    MakeMemberAccessExpression("writer", GetOrAddWriteMethod(signal.Arguments[i].DBusDotnetType)))
+                                    MakeMemberAccessExpression("writer", readWriteMethodsCache.GetOrAddWriteMethod(signal.Arguments[i].DBusDotnetType)))
                                 .AddArgumentListArguments(
                                     Argument(
                                         IdentifierName(signal.Arguments[i].Name is not null
