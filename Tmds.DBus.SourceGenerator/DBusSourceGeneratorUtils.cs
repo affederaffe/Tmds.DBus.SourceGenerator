@@ -81,7 +81,12 @@ internal static class DBusSourceGeneratorUtils
     internal static MemberAccessExpressionSyntax MakeMemberAccessExpression(string left, string middle, string right) =>
         MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, MakeMemberAccessExpression(left, middle), IdentifierName(right));
 
+    internal static MemberAccessExpressionSyntax MakeMemberAccessExpression(string member1, string member2, string member3, string member4) =>
+        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, MakeMemberAccessExpression(member1, member2, member3), IdentifierName(member4));
+
     internal static LiteralExpressionSyntax MakeLiteralExpression(string literal) => LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(literal));
+
+    internal static LiteralExpressionSyntax MakeLiteralExpression(int literal) => LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(literal));
 
     internal static LiteralExpressionSyntax MakeUtf8StringLiteralExpression(string literal) => LiteralExpression(SyntaxKind.StringLiteralExpression, Utf8Literal(literal));
 

@@ -92,32 +92,42 @@ public partial class DBusSourceGeneratorUnit
 
         SyntaxList<SwitchSectionSyntax> switchSections = List<SwitchSectionSyntax>();
 
-        foreach (DBusMethod dBusMethod in dBusInterface.Methods)
+        LocalFunctionStatementSyntax determineMethodIndex = LocalFunctionStatement(
+                PredefinedType(
+                    Token(SyntaxKind.IntKeyword)),
+                Identifier("DetermineMethodIndex"))
+            .WithBody(
+                Block(
+                    dBusInterface.Methods.Select((dBusMethod, i) =>
+                        {
+                            DBusArgument[]? inArgs = GetInArgs(dBusMethod.Arguments);
+                            return IfStatement(
+                                BinaryExpression(SyntaxKind.LogicalAndExpression,
+                                    InvocationExpression(
+                                            MakeMemberAccessExpression("context", nameof(MethodContext.Request), nameof(Message.Member), nameof(MemoryExtensions.SequenceEqual)))
+                                        .WithArgumentList(
+                                            MakeSingletonArgumentList(
+                                                MakeUtf8StringLiteralExpression(dBusMethod.Name!))),
+                                    inArgs?.Length > 0
+                                        ? InvocationExpression(
+                                                MakeMemberAccessExpression("context", nameof(MethodContext.Request), nameof(Message.Signature), nameof(MemoryExtensions.SequenceEqual)))
+                                            .WithArgumentList(
+                                                MakeSingletonArgumentList(
+                                                    MakeUtf8StringLiteralExpression(
+                                                        ParseSignature(inArgs))))
+                                        : MakeMemberAccessExpression("context", nameof(MethodContext.Request), nameof(Message.Signature), nameof(ReadOnlySpan<>.IsEmpty))),
+                                ReturnStatement(
+                                    MakeLiteralExpression(i)));
+                        })
+                        .Aggregate((current, ifStatement) => ifStatement.WithElse(ElseClause(current))),
+                    ReturnStatement(
+                        MakeLiteralExpression(-1))));
+
+        for (int i = 0; i < dBusInterface.Methods.Length; i++)
         {
+            DBusMethod dBusMethod = dBusInterface.Methods[i];
             DBusArgument[]? inArgs = GetInArgs(dBusMethod.Arguments);
             DBusArgument[]? outArgs = GetOutArgs(dBusMethod.Arguments);
-
-            SwitchSectionSyntax switchSection = SwitchSection()
-                .AddLabels(
-                    CasePatternSwitchLabel(
-                        RecursivePattern()
-                            .WithPositionalPatternClause(
-                                PositionalPatternClause()
-                                    .AddSubpatterns(
-                                        Subpattern(
-                                            ConstantPattern(
-                                                MakeLiteralExpression(dBusMethod.Name!))),
-                                        Subpattern(
-                                            inArgs?.Length > 0
-                                                ? ConstantPattern(
-                                                    MakeLiteralExpression(
-                                                        ParseSignature(inArgs)))
-                                                : BinaryPattern(SyntaxKind.OrPattern,
-                                                    ConstantPattern(
-                                                        MakeLiteralExpression(string.Empty)),
-                                                    ConstantPattern(
-                                                        LiteralExpression(SyntaxKind.NullLiteralExpression)))))),
-                        Token(SyntaxKind.ColonToken)));
 
             BlockSyntax switchSectionBlock = Block();
 
@@ -161,17 +171,17 @@ public partial class DBusSourceGeneratorUnit
 
                 StatementSyntax[] argFields = new StatementSyntax[inArgs.Length];
 
-                for (int i = 0; i < inArgs.Length; i++)
+                for (int j = 0; j < inArgs.Length; j++)
                 {
-                    string identifier = inArgs[i].Name is not null
-                        ? SanitizeIdentifier(Pascalize(inArgs[i].Name.AsSpan(), true))
-                        : $"arg{i}";
+                    string identifier = inArgs[j].Name is not null
+                        ? SanitizeIdentifier(Pascalize(inArgs[j].Name.AsSpan(), true))
+                        : $"arg{j}";
                     readParametersMethodBlock = readParametersMethodBlock.AddStatements(
                         ExpressionStatement(
                             AssignmentExpression(SyntaxKind.SimpleAssignmentExpression, IdentifierName(identifier), InvocationExpression(
-                                MakeMemberAccessExpression("reader", readWriteMethodsCache.GetOrAddReadMethod(inArgs[i].DBusDotnetType))))));
-                    argFields[i] = LocalDeclarationStatement(
-                        VariableDeclaration(inArgs[i].DBusDotnetType.ToTypeSyntax())
+                                MakeMemberAccessExpression("reader", readWriteMethodsCache.GetOrAddReadMethod(inArgs[j].DBusDotnetType))))));
+                    argFields[j] = LocalDeclarationStatement(
+                        VariableDeclaration(inArgs[j].DBusDotnetType.ToTypeSyntax())
                             .AddVariables(
                                 VariableDeclarator(identifier)));
                 }
@@ -253,12 +263,11 @@ public partial class DBusSourceGeneratorUnit
                                                             ExpressionStatement(
                                                                 InvocationExpression(
                                                                         MakeMemberAccessExpression("tsc", nameof(TaskCompletionSource<>.SetResult)))
-                                                                    .AddArgumentListArguments(
-                                                                        Argument(
+                                                                    .WithArgumentList(
+                                                                        MakeSingletonArgumentList<ExpressionSyntax>(
                                                                             outArgs?.Length > 0
                                                                                 ? IdentifierName("ret1")
-                                                                                : LiteralExpression(SyntaxKind
-                                                                                    .TrueLiteralExpression)))))
+                                                                                : LiteralExpression(SyntaxKind.TrueLiteralExpression)))))
                                                         .AddCatches(
                                                             CatchClause()
                                                                 .WithDeclaration(
@@ -271,8 +280,8 @@ public partial class DBusSourceGeneratorUnit
                                                                         ExpressionStatement(
                                                                             InvocationExpression(
                                                                                     MakeMemberAccessExpression("tsc", nameof(TaskCompletionSource<>.SetException)))
-                                                                                .AddArgumentListArguments(
-                                                                                    Argument(
+                                                                                .WithArgumentList(
+                                                                                    MakeSingletonArgumentList(
                                                                                         IdentifierName("e")))))))))),
                                     Argument(
                                         LiteralExpression(SyntaxKind.NullLiteralExpression)))),
@@ -320,17 +329,17 @@ public partial class DBusSourceGeneratorUnit
             }
             else if (outArgs?.Length > 1)
             {
-                for (int i = 0; i < outArgs.Length; i++)
+                for (int j = 0; j < outArgs.Length; j++)
                 {
                     replyMethodBlock = replyMethodBlock.AddStatements(
                         ExpressionStatement(
                             InvocationExpression(
-                                    MakeMemberAccessExpression("writer", readWriteMethodsCache.GetOrAddWriteMethod(outArgs[i].DBusDotnetType)))
-                                .AddArgumentListArguments(
-                                    Argument(
-                                        MakeMemberAccessExpression("ret", outArgs[i].Name is not null
-                                            ? SanitizeIdentifier(Pascalize(outArgs[i].Name.AsSpan()))
-                                            : $"Item{i + 1}")))));
+                                    MakeMemberAccessExpression("writer", readWriteMethodsCache.GetOrAddWriteMethod(outArgs[j].DBusDotnetType)))
+                                .WithArgumentList(
+                                    MakeSingletonArgumentList(
+                                        MakeMemberAccessExpression("ret", outArgs[j].Name is not null
+                                            ? SanitizeIdentifier(Pascalize(outArgs[j].Name.AsSpan()))
+                                            : $"Item{j + 1}")))));
                 }
             }
 
@@ -338,8 +347,8 @@ public partial class DBusSourceGeneratorUnit
                 ExpressionStatement(
                     InvocationExpression(
                             MakeMemberAccessExpression("context", nameof(MethodContext.Reply)))
-                        .AddArgumentListArguments(
-                            Argument(
+                        .WithArgumentList(
+                            MakeSingletonArgumentList(
                                 InvocationExpression(
                                     MakeMemberAccessExpression("writer", nameof(MessageWriter.CreateMessage)))))),
                 ExpressionStatement(
@@ -354,12 +363,19 @@ public partial class DBusSourceGeneratorUnit
                             IdentifierName("Reply")))),
                 LocalFunctionStatement(
                         PredefinedType(Token(SyntaxKind.VoidKeyword)), Identifier("Reply"))
-                    .WithBody(replyMethodBlock));
+                    .WithBody(replyMethodBlock),
+                BreakStatement());
 
             switchSections = switchSections.Add(
-                switchSection.AddStatements(
-                    switchSectionBlock.AddStatements(
-                        BreakStatement())));
+                SwitchSection()
+                    .WithLabels(
+                        SingletonList<SwitchLabelSyntax>(
+                            CasePatternSwitchLabel(
+                                ConstantPattern(
+                                    MakeLiteralExpression(i)),
+                                Token(SyntaxKind.ColonToken))))
+                    .WithStatements(
+                        SingletonList<StatementSyntax>(switchSectionBlock)));
         }
 
         MethodDeclarationSyntax replyInterfaceRequestMethod = MethodDeclaration(
@@ -378,13 +394,10 @@ public partial class DBusSourceGeneratorUnit
                     Token(SyntaxKind.AsyncKeyword))
                 .WithBody(
                     Block(
+                        determineMethodIndex,
                         SwitchStatement(
-                                TupleExpression()
-                                    .AddArguments(
-                                        Argument(
-                                            MakeMemberAccessExpression("context", nameof(MethodContext.Request), nameof(Message.MemberAsString))),
-                                        Argument(
-                                            MakeMemberAccessExpression("context", nameof(MethodContext.Request), nameof(Message.SignatureAsString)))))
+                                InvocationExpression(
+                                    IdentifierName(determineMethodIndex.Identifier)))
                             .WithSections(switchSections)))
             : replyInterfaceRequestMethod.WithExpressionBody(
                     ArrowExpressionClause(
