@@ -33,7 +33,7 @@ public class DBusSourceGenerator : IIncrementalGenerator
             initializationContext.AddSource("Tmds.DBus.SourceGenerator.SignalHelper.cs", DBusSourceGeneratorClasses.SignalHelperClass);
             initializationContext.AddSource("Tmds.DBus.SourceGenerator.PathHandler.cs", DBusSourceGeneratorClasses.PathHandlerClass);
             initializationContext.AddSource("Tmds.DBus.SourceGenerator.IDBusInterfaceHandler.cs", DBusSourceGeneratorClasses.DBusInterfaceHandlerInterface);
-            initializationContext.AddSource("Tmds.DBus.SourceGenerator.WriterExtension.WriteNullableString.cs", DBusSourceGeneratorClasses.WriteNullableStringWriterExtension);
+            initializationContext.AddSource("Tmds.DBus.SourceGenerator.WriterExtensions.WriteNullableString.cs", DBusSourceGeneratorClasses.WriteNullableStringWriterExtension);
         });
 
         IncrementalValuesProvider<(DBusNode Node, string GeneratorMode)> generatorProvider = context.AdditionalTextsProvider
