@@ -55,7 +55,7 @@ public partial class DBusSourceGenerator
                     "PathHandler",
                     Token(SyntaxKind.PublicKeyword)),
                 MakeGetOnlyProperty(
-                    IdentifierName("Connection"),
+                    IdentifierName("DBusConnection"),
                     "Connection",
                     Token(SyntaxKind.PublicKeyword),
                     Token(SyntaxKind.AbstractKeyword)),
@@ -104,11 +104,7 @@ public partial class DBusSourceGenerator
                                                 ? ConstantPattern(
                                                     MakeLiteralExpression(
                                                         ParseSignature(inArgs)))
-                                                : BinaryPattern(SyntaxKind.OrPattern,
-                                                    ConstantPattern(
-                                                        MakeLiteralExpression(string.Empty)),
-                                                    ConstantPattern(
-                                                        LiteralExpression(SyntaxKind.NullLiteralExpression)))))),
+                                                : ConstantPattern(MakeLiteralExpression(string.Empty))))),
                         Token(SyntaxKind.ColonToken)));
 
             BlockSyntax switchSectionBlock = Block();

@@ -16,7 +16,7 @@ public partial class DBusSourceGenerator
             .AddModifiers(Token(SyntaxKind.InternalKeyword));
 
         FieldDeclarationSyntax interfaceConst = MakePrivateStringConst("Interface", dBusInterface.Name!, PredefinedType(Token(SyntaxKind.StringKeyword)));
-        FieldDeclarationSyntax connectionField = MakePrivateReadOnlyField("_connection", IdentifierName("Connection"));
+        FieldDeclarationSyntax connectionField = MakePrivateReadOnlyField("_connection", IdentifierName("DBusConnection"));
         FieldDeclarationSyntax destinationField = MakePrivateReadOnlyField("_destination", PredefinedType(Token(SyntaxKind.StringKeyword)));
         FieldDeclarationSyntax pathField = MakePrivateReadOnlyField("_path", PredefinedType(Token(SyntaxKind.StringKeyword)));
 
@@ -27,7 +27,7 @@ public partial class DBusSourceGenerator
                 Parameter(
                         Identifier("connection"))
                     .WithType(
-                        IdentifierName("Connection")),
+                        IdentifierName("DBusConnection")),
                 Parameter(
                         Identifier("destination"))
                     .WithType(

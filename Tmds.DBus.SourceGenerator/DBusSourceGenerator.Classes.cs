@@ -20,13 +20,13 @@ public partial class DBusSourceGenerator
                                              {
                                                  internal static class SignalHelper
                                                  {
-                                                     public static ValueTask<IDisposable> WatchSignalAsync(Connection connection, MatchRule rule, Action<Exception?> handler, bool emitOnCapturedContext = true, ObserverFlags flags = ObserverFlags.None)
+                                                     public static ValueTask<IDisposable> WatchSignalAsync(DBusConnection connection, MatchRule rule, Action<Exception?> handler, bool emitOnCapturedContext = true, ObserverFlags flags = ObserverFlags.None)
                                                          => connection.AddMatchAsync(rule, static (_, _) => null !, static (Exception? e, object _, object? _, object? handlerState) => ((Action<Exception?>)handlerState!).Invoke(e), null, handler, emitOnCapturedContext, flags);
 
-                                                     public static ValueTask<IDisposable> WatchSignalAsync<T>(Connection connection, MatchRule rule, MessageValueReader<T> reader, Action<Exception?, T> handler, bool emitOnCapturedContext = true, ObserverFlags flags = ObserverFlags.None)
+                                                     public static ValueTask<IDisposable> WatchSignalAsync<T>(DBusConnection connection, MatchRule rule, MessageValueReader<T> reader, Action<Exception?, T> handler, bool emitOnCapturedContext = true, ObserverFlags flags = ObserverFlags.None)
                                                          => connection.AddMatchAsync(rule, reader, static (e, arg, _, handlerState) => ((Action<Exception?, T>)handlerState!).Invoke(e, arg), null, handler, emitOnCapturedContext, flags);
 
-                                                     public static ValueTask<IDisposable> WatchPropertiesChangedAsync<T>(Connection connection, string destination, string path, string @interface, MessageValueReader<PropertyChanges<T>> reader, Action<Exception?, PropertyChanges<T>> handler, bool emitOnCapturedContext = true, ObserverFlags flags = ObserverFlags.None)
+                                                     public static ValueTask<IDisposable> WatchPropertiesChangedAsync<T>(DBusConnection connection, string destination, string path, string @interface, MessageValueReader<PropertyChanges<T>> reader, Action<Exception?, PropertyChanges<T>> handler, bool emitOnCapturedContext = true, ObserverFlags flags = ObserverFlags.None)
                                                      {
                                                          MatchRule rule = new()
                                                          {
@@ -76,7 +76,7 @@ public partial class DBusSourceGenerator
                                                              {
                                                                  PathHandler? PathHandler { get; set; }
                                                              
-                                                                 Connection Connection { get; }
+                                                                 DBusConnection Connection { get; }
 
                                                                  string InterfaceName { get; }
 
