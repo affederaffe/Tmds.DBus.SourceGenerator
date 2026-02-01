@@ -20,7 +20,7 @@ public partial class DBusSourceGeneratorUnit
             .AddModifiers(
                 Token(SyntaxKind.InternalKeyword));
 
-        FieldDeclarationSyntax connectionField = MakePrivateReadOnlyField("_connection", IdentifierName(nameof(Connection)));
+        FieldDeclarationSyntax connectionField = MakePrivateReadOnlyField("_connection", IdentifierName(nameof(DBusConnection)));
         FieldDeclarationSyntax destinationField = MakePrivateReadOnlyField("_destination", PredefinedType(Token(SyntaxKind.StringKeyword)));
         FieldDeclarationSyntax pathField = MakePrivateReadOnlyField("_path", PredefinedType(Token(SyntaxKind.StringKeyword)));
 
@@ -31,7 +31,7 @@ public partial class DBusSourceGeneratorUnit
                 Parameter(
                         Identifier("connection"))
                     .WithType(
-                        IdentifierName(nameof(Connection))),
+                        IdentifierName(nameof(DBusConnection))),
                 Parameter(
                         Identifier("destination"))
                     .WithType(

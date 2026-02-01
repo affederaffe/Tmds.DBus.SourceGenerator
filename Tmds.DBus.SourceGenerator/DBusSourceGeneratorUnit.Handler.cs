@@ -60,7 +60,7 @@ public partial class DBusSourceGeneratorUnit
                     "PathHandler",
                     Token(SyntaxKind.PublicKeyword)),
                 MakeGetOnlyProperty(
-                    IdentifierName(nameof(Connection)),
+                    IdentifierName(nameof(DBusConnection)),
                     "Connection",
                     Token(SyntaxKind.PublicKeyword),
                     Token(SyntaxKind.AbstractKeyword)),
