@@ -1,6 +1,8 @@
 using System;
 using System.ComponentModel;
 using System.Xml.Serialization;
+using static Tmds.DBus.SourceGenerator.DBusSourceGeneratorParsing;
+
 
 namespace Tmds.DBus.SourceGenerator;
 
@@ -81,7 +83,7 @@ public class DBusArgument : DBusValue
 public class DBusValue
 {
     [XmlIgnore]
-    private DBusSourceGenerator.DBusDotnetType? _dbusDotnetType;
+    private DBusDotnetType? _dbusDotnetType;
 
     [XmlAttribute("name")]
     public string? Name { get; set; }
@@ -90,5 +92,5 @@ public class DBusValue
     public string? Type { get; set; }
 
     [XmlIgnore]
-    public DBusSourceGenerator.DBusDotnetType DBusDotnetType => _dbusDotnetType ??= DBusSourceGenerator.DBusDotnetType.FromDBusValue(this);
+    public DBusDotnetType DBusDotnetType => _dbusDotnetType ??= DBusDotnetType.FromDBusValue(this);
 }

@@ -3,14 +3,17 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.Win32.SafeHandles;
+using Tmds.DBus.Protocol;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 
 namespace Tmds.DBus.SourceGenerator;
 
-public partial class DBusSourceGenerator
+public static class DBusSourceGeneratorParsing
 {
     public enum DotnetType
     {
@@ -33,7 +36,7 @@ public partial class DBusSourceGenerator
         SafeFileHandle
     }
 
-    private static string Pascalize(ReadOnlySpan<char> name, bool camel = false)
+    internal static string Pascalize(ReadOnlySpan<char> name, bool camel = false)
     {
         bool upperizeNext = !camel;
         StringBuilder sb = new(name.Length);
@@ -57,15 +60,8 @@ public partial class DBusSourceGenerator
         return sb.ToString();
     }
 
-    private static string Camelize(ReadOnlySpan<char> name)
-    {
-        StringBuilder sb = new(Pascalize(name));
-        sb[0] = char.ToLowerInvariant(sb[0]);
-        return sb.ToString();
-    }
-
     [return: NotNullIfNotNull(nameof(dbusValues))]
-    private static string? ParseSignature(IReadOnlyList<DBusValue>? dbusValues)
+    internal static string? ParseSignature(IReadOnlyList<DBusValue>? dbusValues)
     {
         if (dbusValues is null || dbusValues.Count == 0)
             return null;
@@ -78,7 +74,7 @@ public partial class DBusSourceGenerator
     }
 
     [return: NotNullIfNotNull(nameof(dbusValues))]
-    private static TypeSyntax? ParseReturnType(IReadOnlyList<DBusValue>? dbusValues)
+    internal static TypeSyntax? ParseReturnType(IReadOnlyList<DBusValue>? dbusValues)
     {
         return dbusValues?.Count switch
         {
@@ -97,68 +93,68 @@ public partial class DBusSourceGenerator
         };
     }
 
-    private static TypeSyntax ParseTaskReturnType(IReadOnlyList<DBusValue>? dbusValues)
+    internal static TypeSyntax ParseTaskReturnType(IReadOnlyList<DBusValue>? dbusValues)
     {
         return dbusValues?.Count switch
         {
-            0 or null => IdentifierName("Task"),
-            _ => GenericName("Task")
+            0 or null => IdentifierName(nameof(Task)),
+            _ => GenericName(nameof(Task))
                 .AddTypeArgumentListArguments(
                     ParseReturnType(dbusValues))
         };
     }
 
-    private static TypeSyntax ParseValueTaskReturnType(IReadOnlyList<DBusValue>? dbusValues)
+    internal static TypeSyntax ParseValueTaskReturnType(IReadOnlyList<DBusValue>? dbusValues)
     {
         return dbusValues?.Count switch
         {
-            0 or null => IdentifierName("ValueTask"),
-            _ => GenericName("ValueTask")
+            0 or null => IdentifierName(nameof(ValueTask)),
+            _ => GenericName(nameof(ValueTask))
                 .AddTypeArgumentListArguments(
                     ParseReturnType(dbusValues))
         };
     }
 
-    private static TypeSyntax ParseTaskCompletionSourceType(IReadOnlyList<DBusValue>? dbusValues)
+    internal static TypeSyntax ParseTaskCompletionSourceType(IReadOnlyList<DBusValue>? dbusValues)
     {
         return dbusValues?.Count switch
         {
-            0 or null => GenericName("TaskCompletionSource")
+            0 or null => GenericName(nameof(TaskCompletionSource<>))
                 .AddTypeArgumentListArguments(
                     PredefinedType(
                         Token(SyntaxKind.BoolKeyword))),
-            _ => GenericName("TaskCompletionSource")
+            _ => GenericName(nameof(TaskCompletionSource<>))
                 .AddTypeArgumentListArguments(
                     ParseReturnType(dbusValues))
         };
     }
 
-    private static ParameterSyntax[] ParseParameterList(IReadOnlyList<DBusValue> inArgs)
+    internal static ParameterSyntax[] ParseParameterList(IReadOnlyList<DBusValue> inArgs)
     {
         return inArgs.Select((dbusValue, i) =>
                 Parameter(
                         Identifier(dbusValue.Name is not null
                             ? SanitizeIdentifier(
-                                Camelize(dbusValue.Name.AsSpan()))
+                                Pascalize(dbusValue.Name.AsSpan(), true))
                             : $"arg{i}"))
                     .WithType(
                         dbusValue.DBusDotnetType.ToTypeSyntax()))
             .ToArray();
     }
 
-    private static string SanitizeSignature(in string signature) =>
+    internal static string SanitizeSignature(in string signature) =>
         signature.Replace('{', 'e')
             .Replace("}", null)
             .Replace('(', 'r')
             .Replace(')', 'z');
 
-    private static string SanitizeIdentifier(in string identifier)
+    internal static string SanitizeIdentifier(in string identifier)
     {
         bool isAnyKeyword = SyntaxFacts.GetKeywordKind(identifier) != SyntaxKind.None || SyntaxFacts.GetContextualKeywordKind(identifier) != SyntaxKind.None;
         return isAnyKeyword ? $"@{identifier}" : identifier;
     }
 
-    private static string GetPropertiesClassIdentifier(DBusInterface dBusInterface) => $"{Pascalize(dBusInterface.Name.AsSpan())}Properties";
+    internal static string GetPropertiesClassIdentifier(DBusInterface dBusInterface) => $"{Pascalize(dBusInterface.Name.AsSpan())}Properties";
 
     public class DBusDotnetType
     {
@@ -283,16 +279,16 @@ public partial class DBusSourceGenerator
                         str = NullableType(str);
                     return str;
                 case DotnetType.ObjectPath:
-                    return IdentifierName("ObjectPath");
+                    return IdentifierName(nameof(ObjectPath));
                 case DotnetType.Signature:
-                    return IdentifierName("Signature");
+                    return IdentifierName(nameof(Signature));
                 case DotnetType.Variant:
-                    return IdentifierName("VariantValue");
+                    return IdentifierName(nameof(VariantValue));
                 case DotnetType.SafeFileHandle:
-                    return IdentifierName("SafeFileHandle");
+                    return IdentifierName(nameof(SafeFileHandle));
                 case DotnetType.Array:
                     TypeSyntax arr = ArrayType(
-                            innerTypes![0].ToTypeSyntax(nullable))
+                            innerTypes![0].ToTypeSyntax())
                         .AddRankSpecifiers(
                             ArrayRankSpecifier()
                                 .AddSizes(
@@ -301,22 +297,22 @@ public partial class DBusSourceGenerator
                         arr = NullableType(arr);
                     return arr;
                 case DotnetType.Dictionary:
-                    TypeSyntax dict = GenericName("Dictionary")
+                    TypeSyntax dict = GenericName(nameof(Dictionary<,>))
                         .AddTypeArgumentListArguments(
                             innerTypes![0].ToTypeSyntax(),
-                            innerTypes[1].ToTypeSyntax(nullable));
+                            innerTypes[1].ToTypeSyntax());
                     if (nullable)
                         dict = NullableType(dict);
                     return dict;
                 case DotnetType.Tuple when innerTypes!.Length == 1:
-                    return GenericName("ValueTuple")
+                    return GenericName(nameof(ValueTuple))
                         .AddTypeArgumentListArguments(
-                            innerTypes[0].ToTypeSyntax(nullable));
+                            innerTypes[0].ToTypeSyntax());
                 case DotnetType.Tuple:
                     return TupleType()
                         .AddElements(
                             innerTypes.Select(innerType => TupleElement(
-                                    innerType.ToTypeSyntax(nullable)))
+                                    innerType.ToTypeSyntax()))
                                 .ToArray());
                 default:
                     throw new ArgumentOutOfRangeException(nameof(type), type, $"Cannot parse DotnetType with value {type}");
