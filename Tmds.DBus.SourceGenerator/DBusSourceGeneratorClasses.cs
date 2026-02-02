@@ -97,7 +97,7 @@ internal static class DBusSourceGeneratorClasses
                                                 /// <inheritdoc />
                                                 public async ValueTask HandleMethodAsync(MethodContext context)
                                                 {
-                                                    if (context.Request.Interface.SequenceEqual("org.freedesktop.DBus.Properties"u8))
+                                                    if (context.IsPropertiesInterfaceRequest)
                                                     {
                                                         if (context.Request.Member.SequenceEqual("Get"u8) && context.Request.Signature.SequenceEqual("ss"u8))
                                                         {
@@ -152,7 +152,7 @@ internal static class DBusSourceGeneratorClasses
                                                             }
                                                         }
                                                     }
-                                                    else if (context.Request.Interface.SequenceEqual("org.freedesktop.DBus.Introspectable"u8))
+                                                    else if (context.IsDBusIntrospectRequest)
                                                     {
                                                         context.ReplyIntrospectXml(_dbusInterfaces.Select(static x => x.IntrospectXml).ToArray());
                                                     }
