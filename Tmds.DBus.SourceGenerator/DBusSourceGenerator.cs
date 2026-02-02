@@ -29,7 +29,6 @@ public class DBusSourceGenerator : IIncrementalGenerator
 
         context.RegisterPostInitializationOutput(initializationContext =>
         {
-            initializationContext.AddSource("Tmds.DBus.SourceGenerator.PropertyChanges.cs", DBusSourceGeneratorClasses.PropertyChangesClass);
             initializationContext.AddSource("Tmds.DBus.SourceGenerator.SignalHelper.cs", DBusSourceGeneratorClasses.SignalHelperClass);
             initializationContext.AddSource("Tmds.DBus.SourceGenerator.PathHandler.cs", DBusSourceGeneratorClasses.PathHandlerClass);
             initializationContext.AddSource("Tmds.DBus.SourceGenerator.IDBusInterfaceHandler.cs", DBusSourceGeneratorClasses.DBusInterfaceHandlerInterface);

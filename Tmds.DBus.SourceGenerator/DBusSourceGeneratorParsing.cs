@@ -288,7 +288,7 @@ public static class DBusSourceGeneratorParsing
                     return IdentifierName(nameof(SafeFileHandle));
                 case DotnetType.Array:
                     TypeSyntax arr = ArrayType(
-                            innerTypes![0].ToTypeSyntax(nullable))
+                            innerTypes![0].ToTypeSyntax())
                         .AddRankSpecifiers(
                             ArrayRankSpecifier()
                                 .AddSizes(
@@ -300,19 +300,19 @@ public static class DBusSourceGeneratorParsing
                     TypeSyntax dict = GenericName(nameof(Dictionary<,>))
                         .AddTypeArgumentListArguments(
                             innerTypes![0].ToTypeSyntax(),
-                            innerTypes[1].ToTypeSyntax(nullable));
+                            innerTypes[1].ToTypeSyntax());
                     if (nullable)
                         dict = NullableType(dict);
                     return dict;
                 case DotnetType.Tuple when innerTypes!.Length == 1:
                     return GenericName(nameof(ValueTuple))
                         .AddTypeArgumentListArguments(
-                            innerTypes[0].ToTypeSyntax(nullable));
+                            innerTypes[0].ToTypeSyntax());
                 case DotnetType.Tuple:
                     return TupleType()
                         .AddElements(
                             innerTypes.Select(innerType => TupleElement(
-                                    innerType.ToTypeSyntax(nullable)))
+                                    innerType.ToTypeSyntax()))
                                 .ToArray());
                 default:
                     throw new ArgumentOutOfRangeException(nameof(type), type, $"Cannot parse DotnetType with value {type}");

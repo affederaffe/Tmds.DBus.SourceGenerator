@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CSharp;
@@ -244,10 +245,8 @@ public partial class DBusSourceGeneratorUnit
                                 .AddTypeArgumentListArguments(
                                     NullableType(
                                         IdentifierName(nameof(Exception))),
-                                    GenericName("PropertyChanges")
-                                        .AddTypeArgumentListArguments(
-                                            IdentifierName(
-                                                GetPropertiesClassIdentifier(dBusInterface))))),
+                                    IdentifierName(
+                                        GetPropertiesClassIdentifier(dBusInterface)))),
                     Parameter(
                             Identifier("emitOnCapturedContext"))
                         .WithType(
@@ -285,10 +284,8 @@ public partial class DBusSourceGeneratorUnit
                                     Argument(
                                         IdentifierName("flags")))),
                         LocalFunctionStatement(
-                                GenericName("PropertyChanges")
-                                    .AddTypeArgumentListArguments(
-                                        IdentifierName(
-                                            GetPropertiesClassIdentifier(dBusInterface))),
+                                IdentifierName(
+                                    GetPropertiesClassIdentifier(dBusInterface)),
                                 "ReadMessage")
                             .AddModifiers(
                                 Token(SyntaxKind.StaticKeyword))
@@ -318,39 +315,69 @@ public partial class DBusSourceGeneratorUnit
                                             MakeMemberAccessExpression("reader", nameof(Reader.ReadString)))),
                                     LocalDeclarationStatement(
                                         VariableDeclaration(
-                                                GenericName(nameof(System.Collections.Generic.List<>))
-                                                    .AddTypeArgumentListArguments(
-                                                        PredefinedType(Token(SyntaxKind.StringKeyword))))
-                                            .AddVariables(
-                                                VariableDeclarator("changed")
-                                                    .WithInitializer(
-                                                        EqualsValueClause(
-                                                            ImplicitObjectCreationExpression())))),
-                                    ReturnStatement(
+                                                IdentifierName(
+                                                    GetPropertiesClassIdentifier(dBusInterface)))
+                                            .WithVariables(
+                                                SingletonSeparatedList(
+                                                    VariableDeclarator("props")
+                                                        .WithInitializer(
+                                                            EqualsValueClause(
+                                                                InvocationExpression(
+                                                                        IdentifierName("ReadProperties"))
+                                                                    .WithArgumentList(
+                                                                        ArgumentList(
+                                                                            SingletonSeparatedList(
+                                                                                Argument(
+                                                                                        IdentifierName("reader"))
+                                                                                    .WithRefKindKeyword(
+                                                                                        Token(SyntaxKind.RefKeyword)))))))))),
+                                    LocalDeclarationStatement(
+                                        VariableDeclaration(
+                                                IdentifierName(nameof(ArrayEnd)))
+                                            .WithVariables(
+                                                SingletonSeparatedList(
+                                                    VariableDeclarator("headersEnd")
+                                                        .WithInitializer(
+                                                            EqualsValueClause(
+                                                                InvocationExpression(
+                                                                        MakeMemberAccessExpression("reader", nameof(Reader.ReadArrayStart)))
+                                                                    .AddArgumentListArguments(
+                                                                        Argument(
+                                                                            MakeMemberAccessExpression(nameof(DBusType), nameof(DBusType.String))))))))),
+                                    WhileStatement(
                                         InvocationExpression(
-                                                ObjectCreationExpression(
-                                                    GenericName("PropertyChanges")
-                                                        .AddTypeArgumentListArguments(
-                                                            IdentifierName(
-                                                                GetPropertiesClassIdentifier(dBusInterface)))))
+                                                MakeMemberAccessExpression("reader", nameof(Reader.HasNext)))
                                             .AddArgumentListArguments(
                                                 Argument(
+                                                    IdentifierName("headersEnd"))),
+                                        Block(
+                                            LocalDeclarationStatement(
+                                                VariableDeclaration(
+                                                        GenericName(nameof(ReadOnlySpan<>))
+                                                            .WithTypeArgumentList(
+                                                                MakeSingletonTypeArgumentList(SyntaxKind.ByteKeyword)))
+                                                    .WithVariables(
+                                                        SingletonSeparatedList(
+                                                            VariableDeclarator("propertyName")
+                                                                .WithInitializer(
+                                                                    EqualsValueClause(
+                                                                        InvocationExpression(
+                                                                            MakeMemberAccessExpression("reader", nameof(Reader.ReadStringAsSpan)))))))),
+                                            dBusInterface.Properties!.Select((property, i) => IfStatement(
                                                     InvocationExpression(
-                                                            IdentifierName("ReadProperties"))
-                                                        .AddArgumentListArguments(
-                                                            Argument(
-                                                                    IdentifierName("reader"))
-                                                                .WithRefKindKeyword(
-                                                                    Token(SyntaxKind.RefKeyword)),
-                                                            Argument(
-                                                                IdentifierName("changed")))),
-                                                Argument(
-                                                    InvocationExpression(
-                                                        MakeMemberAccessExpression("changed", nameof(System.Collections.Generic.List<>.ToArray)))),
-                                                Argument(
-                                                    InvocationExpression(
-                                                        MakeMemberAccessExpression("reader",
-                                                            readWriteMethodsCache.GetOrAddReadMethod(DBusDotnetType.StringArrayType)))))))))));
+                                                            MakeMemberAccessExpression("propertyName", nameof(MemoryExtensions.SequenceEqual)))
+                                                        .WithArgumentList(
+                                                            MakeSingletonArgumentList(
+                                                                MakeUtf8StringLiteralExpression(property.Name!))),
+                                                    ExpressionStatement(
+                                                        AssignmentExpression(SyntaxKind.OrAssignmentExpression,
+                                                            MakeMemberAccessExpression("props", $"IsInvalidatedBitfield{i / 64}"),
+                                                            BinaryExpression(SyntaxKind.LeftShiftExpression,
+                                                                MakeLiteralExpression(1),
+                                                                MakeLiteralExpression(i % 64))))))
+                                                .Aggregate((current, ifStatement) => ifStatement.WithElse(ElseClause(current))))),
+                                    ReturnStatement(
+                                        IdentifierName("props")))))));
     }
 
     private void AddProperties(ref ClassDeclarationSyntax cl, DBusInterface dBusInterface)
@@ -504,30 +531,97 @@ public partial class DBusSourceGeneratorUnit
                     Block(
                         ReturnStatement(
                             InvocationExpression(
-                                    MakeMemberAccessExpression("_connection", nameof(Connection.CallMethodAsync)))
+                                    MakeMemberAccessExpression("_connection", nameof(DBusConnection.CallMethodAsync)))
                                 .AddArgumentListArguments(
                                     Argument(
-                                        InvocationExpression(IdentifierName("CreateGetAllMessage"))),
+                                        InvocationExpression(
+                                            IdentifierName("CreateGetAllMessage"))),
                                     Argument(messageValueReaderLambda))),
-                        LocalFunctionStatement(IdentifierName(nameof(MessageBuffer)), "CreateGetAllMessage")
+                        LocalFunctionStatement(
+                                IdentifierName(nameof(MessageBuffer)), "CreateGetAllMessage")
                             .WithBody(createGetAllMessageBody))));
     }
 
     private static void AddPropertiesClass(ref ClassDeclarationSyntax cl, DBusInterface dBusInterface)
     {
-        ClassDeclarationSyntax propertiesClass = ClassDeclaration(
-                GetPropertiesClassIdentifier(dBusInterface))
-            .AddModifiers(
-                Token(SyntaxKind.PublicKeyword));
-
-        propertiesClass = dBusInterface.Properties!.Aggregate(propertiesClass, static (current, property) =>
-            current.AddMembers(
-                MakeGetSetProperty(
-                    property.DBusDotnetType .ToTypeSyntax(),
-                    Pascalize(property.Name.AsSpan()),
-                    Token(SyntaxKind.PublicKeyword))));
+        ClassDeclarationSyntax propertiesClass = ClassDeclaration(GetPropertiesClassIdentifier(dBusInterface))
+            .WithModifiers(
+                TokenList(
+                    Token(SyntaxKind.PublicKeyword)))
+            .WithMembers(
+                List(
+                    EnumerateBitfields()
+                        .Concat(
+                            EnumerateProperties())));
 
         cl = cl.AddMembers(propertiesClass);
+        return;
+
+        IEnumerable<MemberDeclarationSyntax> EnumerateBitfields()
+        {
+            bool hasIntBitfield = false;
+            int numLongBitfields = dBusInterface.Properties!.Length / 64;
+            int toFill = dBusInterface.Properties!.Length - numLongBitfields * 64;
+            if (toFill > 32)
+                numLongBitfields++;
+            else
+                hasIntBitfield = true;
+
+            for (int i = 0; i < numLongBitfields; i++)
+                yield return MakeFieldDeclaration($"IsInvalidatedBitfield{i}", PredefinedType(Token(SyntaxKind.ULongKeyword)), Token(SyntaxKind.InternalKeyword));
+
+            if (hasIntBitfield)
+                yield return MakeFieldDeclaration($"IsInvalidatedBitfield{numLongBitfields}", PredefinedType(Token(SyntaxKind.UIntKeyword)), Token(SyntaxKind.InternalKeyword));
+        }
+
+        IEnumerable<MemberDeclarationSyntax> EnumerateProperties()
+        {
+            for (int i = 0; i < dBusInterface.Properties!.Length; i++)
+            {
+                DBusProperty property = dBusInterface.Properties![i];
+                string propertyIdentifier = Pascalize(property.Name.AsSpan());
+                TypeSyntax typeSyntax = NullableType(property.DBusDotnetType.ToTypeSyntax());
+
+                PropertyDeclarationSyntax propertySyntax = PropertyDeclaration(typeSyntax, propertyIdentifier)
+                    .WithModifiers(
+                        TokenList(
+                            Token(SyntaxKind.PublicKeyword)))
+                    .AddAccessorListAccessors(
+                        AccessorDeclaration(SyntaxKind.GetAccessorDeclaration)
+                            .WithSemicolonToken(
+                                Token(SyntaxKind.SemicolonToken)),
+                        AccessorDeclaration(SyntaxKind.SetAccessorDeclaration)
+                            .WithModifiers(
+                                TokenList(
+                                    Token(SyntaxKind.InternalKeyword)))
+                            .WithSemicolonToken(
+                                Token(SyntaxKind.SemicolonToken)));
+
+                    PropertyDeclarationSyntax isInvalidated = PropertyDeclaration(
+                            PredefinedType(
+                                Token(SyntaxKind.BoolKeyword)),
+                            $"Is{propertyIdentifier}Invalidated")
+                        .WithModifiers(
+                            TokenList(
+                                Token(SyntaxKind.PublicKeyword)))
+                        .WithExpressionBody(
+                            ArrowExpressionClause(
+                                BinaryExpression(SyntaxKind.NotEqualsExpression,
+                                    ParenthesizedExpression(
+                                        BinaryExpression(SyntaxKind.BitwiseAndExpression,
+                                            IdentifierName($"IsInvalidatedBitfield{i / 64}"),
+                                            ParenthesizedExpression(
+                                                BinaryExpression(SyntaxKind.LeftShiftExpression,
+                                                    MakeLiteralExpression(1),
+                                                    MakeLiteralExpression(i % 64))))),
+                                    MakeLiteralExpression(0))))
+                        .WithSemicolonToken(
+                            Token(SyntaxKind.SemicolonToken));
+
+                    yield return propertySyntax;
+                    yield return isInvalidated;
+            }
+        }
     }
 
     private void AddReadProperties(ref ClassDeclarationSyntax cl, DBusInterface dBusInterface)
@@ -546,17 +640,7 @@ public partial class DBusSourceGeneratorUnit
                         .WithType(
                             IdentifierName(nameof(Reader)))
                         .AddModifiers(
-                            Token(SyntaxKind.RefKeyword)),
-                    Parameter
-                            (Identifier("changed"))
-                        .WithType(
-                            NullableType(
-                                GenericName(nameof(System.Collections.Generic.List<>))
-                                    .WithTypeArgumentList(
-                                        MakeSingletonTypeArgumentList(SyntaxKind.StringKeyword))))
-                        .WithDefault(
-                            EqualsValueClause(
-                                LiteralExpression(SyntaxKind.NullLiteralExpression))))
+                            Token(SyntaxKind.RefKeyword)))
                 .WithBody(
                     Block(
                         LocalDeclarationStatement(
@@ -620,16 +704,7 @@ public partial class DBusSourceGeneratorUnit
                                                 AssignmentExpression(SyntaxKind.SimpleAssignmentExpression,
                                                     MakeMemberAccessExpression("props", Pascalize(property.Name.AsSpan())),
                                                     InvocationExpression(
-                                                        MakeMemberAccessExpression("reader", readWriteMethodsCache.GetOrAddReadMethod(property.DBusDotnetType))))),
-                                            ExpressionStatement(
-                                                ConditionalAccessExpression(
-                                                    IdentifierName("changed"), InvocationExpression(
-                                                            MemberBindingExpression(
-                                                                IdentifierName("Add")))
-                                                        .AddArgumentListArguments(
-                                                            Argument(
-                                                                MakeLiteralExpression(
-                                                                    Pascalize(property.Name.AsSpan())))))))))
+                                                        MakeMemberAccessExpression("reader", readWriteMethodsCache.GetOrAddReadMethod(property.DBusDotnetType))))))))
                                     .Aggregate((current, ifStatement) => ifStatement.WithElse(ElseClause(current))))),
                         ReturnStatement(
                             IdentifierName("props")))));
@@ -639,7 +714,7 @@ public partial class DBusSourceGeneratorUnit
         Block(
             ReturnStatement(
                 InvocationExpression(
-                        MakeMemberAccessExpression("_connection", nameof(Connection.CallMethodAsync)))
+                        MakeMemberAccessExpression("_connection", nameof(DBusConnection.CallMethodAsync)))
                     .WithArgumentList(args)),
             LocalFunctionStatement(IdentifierName(nameof(MessageBuffer)), "CreateMessage")
                 .WithBody(createMessageBody));
@@ -672,7 +747,7 @@ public partial class DBusSourceGeneratorUnit
                                 .WithInitializer(
                                     EqualsValueClause(
                                         InvocationExpression(
-                                            MakeMemberAccessExpression("_connection", nameof(Connection.GetMessageWriter)))))))),
+                                            MakeMemberAccessExpression("_connection", nameof(DBusConnection.GetMessageWriter)))))))),
                 ExpressionStatement(
                     InvocationExpression(
                             MakeMemberAccessExpression("writer", nameof(MessageWriter.WriteMethodCallHeader)))

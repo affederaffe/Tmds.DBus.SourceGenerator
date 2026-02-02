@@ -40,14 +40,15 @@ internal static class DBusSourceGeneratorUtils
                                 Token(SyntaxKind.EnableKeyword), true)))))
             .NormalizeWhitespace();
 
-    internal static FieldDeclarationSyntax MakePrivateReadOnlyField(string identifier, TypeSyntax type) =>
+    internal static FieldDeclarationSyntax MakeFieldDeclaration(string identifier, TypeSyntax type, params SyntaxToken[] modifiers) =>
         FieldDeclaration(
                 VariableDeclaration(type)
                     .AddVariables(
                         VariableDeclarator(identifier)))
-            .AddModifiers(
-                Token(SyntaxKind.PrivateKeyword),
-                Token(SyntaxKind.ReadOnlyKeyword));
+            .AddModifiers(modifiers);
+
+    internal static FieldDeclarationSyntax MakePrivateReadOnlyField(string identifier, TypeSyntax type) =>
+        MakeFieldDeclaration(identifier, type, Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
 
     internal static PropertyDeclarationSyntax MakeGetOnlyProperty(TypeSyntax type, string identifier, params SyntaxToken[] modifiers) =>
         PropertyDeclaration(type, identifier)

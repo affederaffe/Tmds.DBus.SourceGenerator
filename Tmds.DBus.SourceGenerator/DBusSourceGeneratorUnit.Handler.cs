@@ -683,7 +683,7 @@ public partial class DBusSourceGeneratorUnit
                                 .WithInitializer(
                                     EqualsValueClause(
                                         InvocationExpression(
-                                            MakeMemberAccessExpression("Connection", nameof(Connection.GetMessageWriter)))))))));
+                                            MakeMemberAccessExpression("Connection", nameof(DBusConnection.GetMessageWriter)))))))));
 
             ArgumentListSyntax args = ArgumentList()
                 .AddArguments(
@@ -729,7 +729,7 @@ public partial class DBusSourceGeneratorUnit
             body = body.AddStatements(
                 ExpressionStatement(
                     InvocationExpression(
-                            MakeMemberAccessExpression("Connection", nameof(Connection.TrySendMessage)))
+                            MakeMemberAccessExpression("Connection", nameof(DBusConnection.TrySendMessage)))
                         .AddArgumentListArguments(
                             Argument(
                                 InvocationExpression(
